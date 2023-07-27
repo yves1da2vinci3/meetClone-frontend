@@ -11,6 +11,7 @@ import { Avatar, Button, Input, TextInput } from '@mantine/core'
 import image1 from '../assets/image1.svg'
 import image2 from '../assets/image2.svg'
 import image3 from '../assets/image3.svg'
+import { useNavigate } from 'react-router-dom'
 interface CarouselItem {
     id: number;
     imageUrl :string;
@@ -41,6 +42,7 @@ function HomeScreen() {
             desc : "Personne ne peut rejoindre une réunion sans y avoir été invité ou admis par l'organisateur"
         },
     ]
+    const navigate = useNavigate()
   return (
     <div className='h-screen flex-1 flex flex-col ' >
 {/* NavBar */}
@@ -88,7 +90,7 @@ function HomeScreen() {
         {/* Button */}
         <div className='flex md:flex-row flex-col gap-y-2 items-center mt-10 md:mt-24 gap-x-2' >
             {/* New Session */}
-            <Button leftIcon={<MdVideoCall size={25} color='white' /> } className='bg-[#1B73E8] h-[3rem]' >Nouvelle reunion</Button>
+            <Button onClick={()=>navigate("/room")} leftIcon={<MdVideoCall size={25} color='white' /> } className='bg-[#1B73E8] h-[3rem]' >Nouvelle reunion</Button>
             {/* Join Session */}
             <Input
       icon={<BiSolidKeyboard size={23} />}
