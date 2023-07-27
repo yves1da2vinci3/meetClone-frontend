@@ -92,6 +92,7 @@ function HomeScreen() {
             {/* Join Session */}
             <Input
       icon={<BiSolidKeyboard size={23} />}
+      
       placeholder="entrez le code du lien"
       className='bg-red-100'
       size="lg"

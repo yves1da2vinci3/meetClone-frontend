@@ -3,6 +3,7 @@ import reactLogo from './assets/react.svg'
 import './App.css'
 import { Route,  Routes,BrowserRouter as Router } from 'react-router-dom'
 import HomeScreen from './screens/HomeScreen'
+import RoomScreen from './screens/RoomScreen'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -11,6 +12,7 @@ function App() {
     <Router>
       <Routes>
         <Route path='/' element={<HomeScreen/>}  />
+        <Route path='/room' element={<RoomScreen/>}  />
       </Routes>
     </Router>
   )
