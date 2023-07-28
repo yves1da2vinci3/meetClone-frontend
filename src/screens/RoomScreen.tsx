@@ -46,6 +46,7 @@ const navigate = useNavigate()
     const [ShowLeftParticipant, setShowLeftParticipant] = useState(false);
     const [Messages, setMessages] = useState([]);
 // Use a Set to store the unique messageId values
+
 const uniqueMessageIds = new Set<string>();
     useEffect(()=>{
       // get the Room
@@ -94,18 +95,27 @@ const uniqueMessageIds = new Set<string>();
         }
       })
       // HandRaise
-      socket.on("raiseHand",(data :object)=>{
-        if(data.roomId === params.roomId) {
-          const handIdx = handRaiseIds.findIndex(handRaiseId => handRaiseId === data.userId)
-          if(handIdx !== -1) {
-           const newHandis = handRaiseIds.filter(handRaiseId => handRaiseId !==data.userId)
-           sethandRaiseIds(newHandis)
-          }else{
-            const newHandis = [...handRaiseIds,data.userId]
-            sethandRaiseIds(newHandis)
-          }
-        }
-      })
+      
+      // Socket event handling for raising hand
+socket.on("raiseHand", (data: object) => {
+  if (data.roomId === params.roomId) {
+    sethandRaiseIds((prevHandRaiseIds) => [...prevHandRaiseIds, data.userId]);
+  }
+})
+
+// Socket event handling for putting hand down
+socket.on("putHandDown", (data: object) => {
+  if (data.roomId === params.roomId) {
+    sethandRaiseIds((prevHandRaiseIds) =>
+      prevHandRaiseIds.filter((id) => id !== data.userId)
+    );
+  }
+});
+
+  // Handle Media
+
+  // listen To the media
+  socket.on('media', handleMediaStream);
     },[])
     // Manage user asking to join
     const [showCandidate,setShowCandidate] =useState(false)
@@ -198,7 +208,12 @@ useEffect(()=>{
 },[Room])
 
 // Hand Raise
-const [handRaiseIds,sethandRaiseIds] = useState([''])
+const [handRaiseIds,sethandRaiseIds] = useState([])
+
+
+
+
+
 
 const handRaise = async() => { 
   socket.emit('raiseHand',{
@@ -206,8 +221,64 @@ const handRaise = async() => {
     userId :userRef.current._id
   })
  }
+
+const putHandDown = async() => { 
+  socket.emit('putHandDown',{
+    roomId : params.roomId,
+    userId :userRef.current._id
+  })
+ }
+
+// Media Part
+const videoRefs = useRef({});
+
+
+const handleMediaStream = (data:object) => {
+  // Check if the roomId matches and if participantId is present in the data
+  if (data.roomId === params.roomId && data.participantId) {
+    const videoElement = videoRefs.current[data.participantId];
+    if (videoElement) {
+      // Set the received stream as the srcObject of the video element
+      videoElement.srcObject = data.stream;
+      videoElement.play().catch((error) => console.error('Error playing video:', error));
+    }
+  }
+};
+// const startMediaStream = async (socket:any) => {
+//   try {
+//     console.log( videoTestRef.current)
+//     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+//     videoTestRef.current.srcObject = stream
+//     // Send media stream to the server
+//     socket.emit('media', { type: 'stream', stream : stream.getVideoTracks(), participantId: userRef.current._id, roomId: params.roomId });
+
+//     console.log('Media stream sent to the server:', stream);
+//   } catch (error) {
+//     console.error('Error accessing media:', error);
+//   }
+// };
+// const startMediaStream = async () => {
+//   try {
+//     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+// console.log(stream)
+//     // Set the media stream as the source for the video element
+//     if (videoRef.current) {
+//       videoRef.current.srcObject = stream;
+//     }
+//   } catch (error) {
+//     console.error('Error accessing media:', error);
+//   }
+// };
+// const videoRef = useRef(null);
+// useEffect(()=>{
+
+//   startMediaStream();
+
+// },[navigator.mediaDevices])
+
   return (
     <div className='h-screen overflow-hidden flex flex-col p-4 relative' >
+       {/* <video ref={videoRef} autoPlay playsInline /> */}
      <input ref={FileInput} type='file' className='hidden' onChange={FileHandler} />
       {/* Notification to join the meet */}
       <div className={`w-[17rem] z-50 drop-shadow-xl h-[8rem] bg-white rounded-xl absolute bottom-10 items-center justify-center right-4 gap-y-2  ${showCandidate ? "translate-y-[0rem]" : "translate-y-[12rem]"} transition duration-[200ms] ease-in-out delay-[100ms] z-40 flex-col flex p-3`} >
@@ -349,11 +420,11 @@ const handRaise = async() => {
     </div>
 </div>
 {/* participants */}
-<div style={GridStyle}  className={`flex-1 grid  gap-2 border rounded-lg   relative`} >
-    {/* Me Or Presentation */}
-      { Room.participants.map((participant,index)=> (
+<div style={GridStyle} className={`flex-1 grid gap-2 border rounded-lg relative`}>
+  {/* Me Or Presentation */}
+  { Room.participants.map((participant,index)=> (
          <div key={index.toString()} className=' items-center flex justify-center  rounded-lg bg-black relative' >
-          {handRaiseIds.some(hId => hId === userRef.current._id) && <PiHandFill className='absolute top-6 right-6 ' color='#F7D7B5'  size={25}  /> }
+          {handRaiseIds.includes(participant._id) && <PiHandFill className='absolute top-6 right-6 ' color='#F7D7B5'  size={25}  /> }
          <img className='h-[5rem] w-[5rem] rounded-full' src={apiUrl+ participant.photoUrl} />
          <div className='absolute bottom-0 z-40  h-[3rem] items-center flex justify-between px-2  w-full' >
              <p className='text-white' >{participant.fullname === userRef.current.fullname ? "Vous" : participant.fullname }</p>
@@ -364,7 +435,6 @@ const handRaise = async() => {
          </div>
      </div>
       )) }
- 
 </div>
 
 {/* Option */}
@@ -426,7 +496,7 @@ const handRaise = async() => {
 
       <Menu.Dropdown>
        
-    <Menu.Item className={handRaiseIds.some(hId => hId === userRef.current._id)?"bg-blue-200" :"bg-white"} onClick={()=>handRaise()}  icon={<PiHandFill size={14} />}>hand Raise</Menu.Item>
+    <Menu.Item className={handRaiseIds.includes(userRef.current._id)?"bg-blue-200" :"bg-white"} onClick={()=> handRaiseIds.includes(userRef.current._id)? putHandDown() : handRaise()}  icon={<PiHandFill size={14} />}>hand Raise</Menu.Item>
     {/* <Menu.Item  icon={<BsEmojiSmile size={14} />}>send Emoji</Menu.Item> */}
 
       </Menu.Dropdown>
