@@ -6,10 +6,10 @@ import RoomScreen from './screens/RoomScreen'
 import Login from './screens/Login'
 import Signup from './screens/SignupScreen'
 import socketIO from 'socket.io-client';
-const socket = socketIO.connect('http://localhost:3000',{
-  
-});
+import { io } from 'socket.io-client';
+import { apiUrl } from './config/ApiUrl'
 
+const socket = io(`${apiUrl}`);
 function App() {
 
   return (
