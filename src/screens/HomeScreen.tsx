@@ -127,11 +127,7 @@ function HomeScreen({socket}:HomeProps) {
         localStorage.removeItem("participant")
         navigate("/login")
      }
-     useEffect(() => {
-        if (!localStorage.getItem("participant")) {
-          navigate("/login");
-        }
-      }, [localStorage.getItem("participant")]);
+    
 
       const [RoomId,setRoomId] = useState("")
 
@@ -187,11 +183,17 @@ function HomeScreen({socket}:HomeProps) {
       useEffect(()=>{
        
         const roomId = queryParams.get('r');
-        
+        console.log("oh:",localStorage.getItem("participant"))
         if(roomId){
             joinRoom(roomId);
         }
       },[])
+      useEffect(() => {
+        
+          if (!localStorage.getItem("participant")) {
+            navigate("/login");
+          }
+        }, []);
   return (
     <div className='h-screen flex-1 flex flex-col ' >
           <LoadingOverlay visible={isLoading} />
@@ -227,14 +229,14 @@ function HomeScreen({socket}:HomeProps) {
         </div>
         <Menu  position="bottom-end" shadow="md" width={270}>
       <Menu.Target>
-      <Avatar className='cursor-pointer' color="cyan" radius="xl">{getInitials(parsedData?.fullname || "")}</Avatar>
+      <Avatar className='cursor-pointer' color="cyan" radius="xl">{ localStorageData ? getInitials(parsedData?.fullname || "") :""}</Avatar>
       </Menu.Target>
 
       <Menu.Dropdown>
         <Menu.Item    > <div className="flex items-center gap-x-3" >   <div className="h-6 w-6 rounded-full " >
-        <Avatar  className="rounded-full"  src={apiUrl+ parsedData?.photoUrl} alt="userImg" size={25} />
-    </div><p>{parsedData?.fullname }</p></div> </Menu.Item>
-    <Menu.Item icon={<MdEmail size={14} />}>{parsedData?.email }</Menu.Item>
+        <Avatar  className="rounded-full"  src={localStorageData? apiUrl+ parsedData?.photoUrl : ""} alt="userImg" size={25} />
+    </div><p>{localStorageData? parsedData?.fullname : "" }</p></div> </Menu.Item>
+    <Menu.Item icon={<MdEmail size={14} />}>{localStorageData ? parsedData?.email : "" }</Menu.Item>
     <Menu.Item onClick={()=>logout()} icon={<BiLogOut size={14} />}>Se deconnecter</Menu.Item>
 
       </Menu.Dropdown>
