@@ -1,0 +1,90 @@
+ useEffect(() => {
+    // get the Room
+    socket.emit("getRoom", {
+      roomId: params.roomId
+    });
+
+    socket.on("getRoom", (data: { room: object }) => {
+      setRoom(data.room);
+    });
+
+    // somebody wants to join
+    socket.on("somebodyWantToJoinRoom", (data: { roomId: string; adminId: string; user: any }) => {
+      if (data.roomId === params.roomId) {
+        if (userRef.current._id === data.adminId) {
+          setCandidate(data.user);
+          toggle();
+        }
+      }
+    });
+
+    // User Join
+    socket.on("somebodyJoined", (data: { roomId: string }) => {
+      if (data.roomId === params.roomId) {
+        setRoom(data.room);
+        const peer = addPeer(payload.signal, payload.callerID, stream);
+        peersRef.current.push({
+          peerID: payload.callerID,
+          peer,
+          user: payload.user,
+        });
+
+        const peerObj = {
+          peerID: payload.callerID,
+          peer,
+          user: payload.user,
+        };
+
+        setPeers((users) => [...users, peerObj]);
+        joinAudio.current.play();
+      }
+    });
+
+    // Message received
+    socket.on("receiveMessage", (data: { roomId: string; message: Message }) => {
+      console.log(data.message.createdTime);
+      if (data.roomId === params.roomId && !uniqueMessageIds.has(data.message.messageId)) {
+        // Add the message to the state and the Set if it's not already present
+        setMessages((prevMessages) => [...prevMessages, data.message]);
+        uniqueMessageIds.add(data.message.messageId);
+        msgAudio.current.play();
+      }
+    });
+
+    // Left the Meet
+    socket.on("leftMeeting", (data: { roomId: string; participant: any }) => {
+      if (data.roomId === params.roomId) {
+        setLeftParticipant(data.participant);
+        setRoom(data.room);
+        setShowLeftParticipant(true);
+        const peerObj = peersRef.current.find((p) => p.peerID === id);
+        if (peerObj) peerObj.peer.destroy();
+        const peers = peersRef.current.filter((p) => p.peerID !== id);
+        peersRef.current = peers;
+        setPeers((users) => users.filter((p) => p.peerID !== id));
+        leaveAudio.current.play();
+        setTimeout(() => {
+          setShowLeftParticipant(false);
+        }, 3000);
+      }
+    });
+
+    // HandRaise
+    // Socket event handling for raising hand
+    socket.on("raiseHand", (data: { roomId: string; userId: string }) => {
+      if (data.roomId === params.roomId) {
+        sethandRaiseIds((prevHandRaiseIds) => [...prevHandRaiseIds, data.userId]);
+      }
+    });
+
+    // Socket event handling for putting hand down
+    socket.on("putHandDown", (data: { roomId: string; userId: string }) => {
+      if (data.roomId === params.roomId) {
+        sethandRaiseIds((prevHandRaiseIds) => prevHandRaiseIds.filter((id) => id !== data.userId));
+      }
+    });
+
+    // Handle Media
+
+    // listen To the media
+  }, []);

@@ -1,6 +1,6 @@
 import {FcGoogle} from 'react-icons/fc'
 import {FaGithub} from 'react-icons/fa'
-import { EventHandler, FormEvent, useRef, useState } from 'react'
+import { EventHandler, FormEvent, createRef, useRef, useState } from 'react'
 import { BsArrowLeft, BsPlus } from 'react-icons/bs'
 import { Avatar, LoadingOverlay, MultiSelect, PasswordInput, TextInput } from '@mantine/core'
 import { Link, useNavigate } from 'react-router-dom'
@@ -16,7 +16,7 @@ export default function Signup() {
        const [confirmPassword,setConfirmPassword] = useState("")
        const [isLoading,setIsLoading] = useState(false)
        const [Username,setUsername] = useState("")
-       const fileInput = useRef(null)
+       const fileInput = createRef<HTMLInputElement>()
        const [stepStatus,setstepStatus] = useState(1)
     //    Data
   
@@ -66,10 +66,18 @@ export default function Signup() {
         setIsLoading(true)
         // Create a FormData object to send the file along with other form data
         const formData = new FormData();
-        formData.append('image', file);
-        formData.append('email', email);
-        formData.append('password', password);
-        formData.append('fullName', Username);
+        if (file) {
+          formData.append('image', file);
+        }
+        if (email) {
+          formData.append('email', email);
+        }
+        if (password) {
+          formData.append('password', password);
+        }
+        if (Username) {
+          formData.append('fullName', Username);
+        }
   
         // Make the API call to your backend server for user signup
         const response = await httpClient.post('/auth/register', formData, {

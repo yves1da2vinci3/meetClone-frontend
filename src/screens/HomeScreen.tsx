@@ -79,10 +79,20 @@ function useCurrentTime(): string {
   
     return currentDate;
   }
-  
+interface ParticipantData {
+  // Define the properties of the Participant data object
+  // Replace these with the actual properties in your data
+  _id: string;
+  fullname: string;
+  photoUrl: string;
+  email : string;
+  // Add more properties as needed
+} 
+
 function HomeScreen({socket}:HomeProps) {
     const location = useLocation();
-
+    const localStorageData = localStorage.getItem("participant");
+    const parsedData: ParticipantData | null = localStorageData ? JSON.parse(localStorageData) : null;
     const queryParams = new URLSearchParams(location.search);
       const [isLoading,setIsLoading] = useState(false)
       
@@ -129,11 +139,12 @@ function HomeScreen({socket}:HomeProps) {
     const HandlerRoomCreation = ():void => { 
         setIsLoading(true)
         const RoomId = generateKey()
+
         socket.emit('createRoom',{
-          user : JSON.parse(localStorage.getItem('participant')),
+          user : parsedData,
           roomId : RoomId,
         })
-        socket.on("feedbackCreatingRoom",(data:object)=> {
+        socket.on("feedbackCreatingRoom",(data:{status :string})=> {
           if(data.status === "success"){
             setIsLoading(false)
             navigate(`/room/${RoomId}`)
@@ -144,13 +155,14 @@ function HomeScreen({socket}:HomeProps) {
       const joinRoom = (roomId :string):void => {
         setIsLoading(true)
         console.log("click on join button");
+    
         socket.emit("joinRoom", {
           roomId: roomId ? roomId : RoomId,
-          user : JSON.parse(localStorage.getItem("participant")),
+          user : parsedData,
         });
       
-        socket.on("feedbackJoiningRoom", (data) => {
-            if(data.roomId === RoomId || data.roomId === queryParams.get('r') && data.askerId === JSON.parse(localStorage.getItem("participant") )._id ){
+        socket.on("feedbackJoiningRoom", (data : { roomId : string,askerId :string,status : string,message : string }) => {
+            if(data.roomId === RoomId || data.roomId === queryParams.get('r') && data.askerId === parsedData?._id ){
                 console.log("ahi")
                 if (data.status === "success") {
                     console.log("working");
@@ -215,14 +227,14 @@ function HomeScreen({socket}:HomeProps) {
         </div>
         <Menu  position="bottom-end" shadow="md" width={270}>
       <Menu.Target>
-      <Avatar className='cursor-pointer' color="cyan" radius="xl">{getInitials( JSON.parse(localStorage.getItem("participant"))?.fullname ||"ybes" )}</Avatar>
+      <Avatar className='cursor-pointer' color="cyan" radius="xl">{getInitials(parsedData?.fullname || "")}</Avatar>
       </Menu.Target>
 
       <Menu.Dropdown>
         <Menu.Item    > <div className="flex items-center gap-x-3" >   <div className="h-6 w-6 rounded-full " >
-        <Avatar  className="rounded-full"  src={apiUrl+ JSON.parse(localStorage.getItem("participant"))?.photoUrl} alt="userImg" size={25} />
-    </div><p>{JSON.parse(localStorage.getItem("participant"))?.fullname  }</p></div> </Menu.Item>
-    <Menu.Item icon={<MdEmail size={14} />}>{JSON.parse(localStorage.getItem("participant"))?.email  }</Menu.Item>
+        <Avatar  className="rounded-full"  src={apiUrl+ parsedData?.photoUrl} alt="userImg" size={25} />
+    </div><p>{parsedData?.fullname }</p></div> </Menu.Item>
+    <Menu.Item icon={<MdEmail size={14} />}>{parsedData?.email }</Menu.Item>
     <Menu.Item onClick={()=>logout()} icon={<BiLogOut size={14} />}>Se deconnecter</Menu.Item>
 
       </Menu.Dropdown>
@@ -254,7 +266,7 @@ function HomeScreen({socket}:HomeProps) {
       className='bg-red-100'
       size="lg"
     />
-              {focused ===true || RoomId.length>3 ?  <Button onClick={()=>joinRoom()}  className={`${RoomId.length>3 ? "text-blue-500 font-semibold" : "text-gray-300"}  bg-white hover:bg-white h-[3rem]`}>Participer</Button> : null}  
+              {focused ===true || RoomId.length>3 ?  <Button onClick={()=>joinRoom(RoomId)}  className={`${RoomId.length>3 ? "text-blue-500 font-semibold" : "text-gray-300"}  bg-white hover:bg-white h-[3rem]`}>Participer</Button> : null}  
 
         </div>
         </div>

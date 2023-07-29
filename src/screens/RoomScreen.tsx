@@ -9,11 +9,10 @@ import { MdScreenShare } from 'react-icons/md'
 import { FaPaperPlane } from 'react-icons/fa'
 import { PiHandFill } from 'react-icons/pi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import httpClient, { apiUrl } from '../config/ApiUrl'
+import httpClient, { apiUrl, frontendUrl } from '../config/ApiUrl'
 import TimeAgo from 'timeago-react'
 import * as timeago from 'timeago.js';
 import EmojiPicker from 'emoji-picker-react';
-
 // import it first.
 import fr from 'timeago.js/lib/lang/fr';
 import { MapType } from '../utils/File'
@@ -28,95 +27,147 @@ interface RoomProps {
   socket :any
 }
 interface Message {
+  type ? :string
+  name ? :string
+  url ? :string
   fullname: string;
   senderId: string;
   createdTime: string;
   content: string;
   messageId: string;
+  fileType :string;
 }
+interface Participant {
+  email :string;
+  photoUrl ? :string
+  _id : string
+  fullname: string;
+  
+}
+interface ParticipantData {
+  // Define the properties of the Participant data object
+  // Replace these with the actual properties in your data
+  _id: string;
+  fullname: string;
+  // Add more properties as needed
+}
+interface Room {
+  adminId : string;
+  participants : any[]
+}
+import joinSFX from "../sounds/join.mp3";
+import msgSFX from "../sounds/message.mp3";
+import leaveSFX from "../sounds/leave.mp3";
+import MeetGrid from '../components/MeetGrid'
+
+
 function RoomScreen({socket}:RoomProps) {
+  const joinAudio = useRef(new Audio(joinSFX))
+  const msgAudio = useRef(new Audio(msgSFX))
+  const leaveAudio = useRef(new Audio(leaveSFX))
 const navigate = useNavigate()
-  const userRef = useRef(JSON.parse(localStorage.getItem("participant"))) 
+const localStorageData = localStorage.getItem("participant");
+
+// Parse the data if it exists, or set to null if not found
+const parsedData: ParticipantData | null = localStorageData ? JSON.parse(localStorageData) : null;
+const userRef = useRef<ParticipantData | null>(parsedData);
   const params = useParams()
-  const [Room,setRoom] =useState({adminId : "",participants :[]})
+  const [Room,setRoom] =useState<Room>({adminId : "",participants :[]})
     const [opened, { open, close }] = useDisclosure(false);
     const [active, setActive] = useState(1);
     const [candidate, setCandidate] = useState({photoUrl : "",fullname : ""});
     const [LeftParticipant, setLeftParticipant] = useState({fullname : ""});
     const [ShowLeftParticipant, setShowLeftParticipant] = useState(false);
-    const [Messages, setMessages] = useState([]);
+    const [Messages, setMessages] = useState<Message[]>([]);
 // Use a Set to store the unique messageId values
 
 const uniqueMessageIds = new Set<string>();
-    useEffect(()=>{
-      // get the Room
-      socket.emit("getRoom",{
-        roomId : params.roomId
-      })
+useEffect(() => {
+  // get the Room
+  socket.emit("getRoom", {
+    roomId: params.roomId
+  });
 
-      socket.on("getRoom",(data:object)=>{
-        setRoom(data.room)
-      })
-      // somebidy want to join
-      socket.on("somebodyWantToJoinRoom",(data:object)=>{
-        console.log(data)
-          if(data.roomId === params.roomId ){
-            if(userRef.current._id === data.adminId){
-              setCandidate(data.user)
-              toggle()
-            }
-          }
-      })
-      // User Join 
-      socket.on("somebodyJoined",(data:object) =>{
-        if(data.roomId === params.roomId){
-          setRoom(data.room)
-        }
-      })
-      // Message received
-      socket.on("receiveMessage", (data: { roomId: string; message: Message }) => {
-        console.log(data.message.createdTime);
-        if (data.roomId === params.roomId && !uniqueMessageIds.has(data.message.messageId)) {
-          // Add the message to the state and the Set if it's not already present
-          setMessages((prevMessages) => [...prevMessages, data.message]);
-          uniqueMessageIds.add(data.message.messageId);
-        }
-      });
-      // Left the Meet
+  socket.on("getRoom", (data: { room: Room }) => {
+    setRoom(data.room);
+  });
 
-      socket.on("leftMeeting",(data:object)=>{
-        if(data.roomId === params.roomId) {
-          setLeftParticipant(data.participant)
-          setRoom(data.room)
-          setShowLeftParticipant(true)
-          setTimeout(()=>{
-            setShowLeftParticipant(false)
-          },3000)
-        }
-      })
-      // HandRaise
+  // somebody wants to join
+  socket.on("somebodyWantToJoinRoom", (data: { roomId: string; adminId: string; user: any }) => {
+    if (data.roomId === params.roomId) {
+      if (userRef?.current?._id === data.adminId) {
+        setCandidate(data.user);
+        toggle();
+      }
+    }
+  });
+
+  // User Join
+  socket.on("somebodyJoined", (data: { roomId: string,room :Room }) => {
+    if (data.roomId === params.roomId) {
+      setRoom(data.room);
+      // const peer = addPeer(payload.signal, payload.callerID, stream);
+      // peersRef.current.push({
+      //   peerID: payload.callerID,
+      //   peer,
+      //   user: payload.user,
+      // });
+
+      // const peerObj = {
+      //   peerID: payload.callerID,
+      //   peer,
+      //   user: payload.user,
+      // };
+
+      // setPeers((users) => [...users, peerObj]);
+      joinAudio.current.play();
+    }
+  });
+
+  // Message received
+  socket.on("receiveMessage", (data: { roomId: string; message: Message }) => {
+    console.log(data.message.createdTime);
+    if (data.roomId === params.roomId && !uniqueMessageIds.has(data.message.messageId)) {
+      // Add the message to the state and the Set if it's not already present
+      setMessages((prevMessages:Message[]) => [...prevMessages, data.message]);
+      uniqueMessageIds.add(data.message.messageId);
+      msgAudio.current.play();
+    }
+  });
+
+  // Left the Meet
+  socket.on("leftMeeting", (data: { roomId: string; participant: any,room :Room }) => {
+    if (data.roomId === params.roomId) {
+      setLeftParticipant(data.participant);
+      setRoom(data.room);
+      setShowLeftParticipant(true);
       
-      // Socket event handling for raising hand
-socket.on("raiseHand", (data: object) => {
-  if (data.roomId === params.roomId) {
-    sethandRaiseIds((prevHandRaiseIds) => [...prevHandRaiseIds, data.userId]);
-  }
-})
+      leaveAudio.current.play();
+      setTimeout(() => {
+        setShowLeftParticipant(false);
+      }, 3000);
+    }
+  });
 
-// Socket event handling for putting hand down
-socket.on("putHandDown", (data: object) => {
-  if (data.roomId === params.roomId) {
-    sethandRaiseIds((prevHandRaiseIds) =>
-      prevHandRaiseIds.filter((id) => id !== data.userId)
-    );
-  }
-});
+  // HandRaise
+  // Socket event handling for raising hand
+  socket.on("raiseHand", (data: { roomId: string; userId: string }) => {
+    if (data.roomId === params.roomId) {
+      sethandRaiseIds((prevHandRaiseIds:string[]) => [...prevHandRaiseIds, data.userId]);
+    }
+  });
+
+  // Socket event handling for putting hand down
+  socket.on("putHandDown", (data: { roomId: string; userId: string }) => {
+    if (data.roomId === params.roomId) {
+      sethandRaiseIds((prevHandRaiseIds:string[]) => prevHandRaiseIds.filter((id) => id !== data.userId));
+    }
+  });
 
   // Handle Media
 
   // listen To the media
-  socket.on('media', handleMediaStream);
-    },[])
+}, []);
     // Manage user asking to join
     const [showCandidate,setShowCandidate] =useState(false)
 
@@ -146,8 +197,8 @@ socket.on("putHandDown", (data: object) => {
 
       const sendMessage = () => { 
         const message = {
-          fullname : userRef.current.fullname,
-          senderId : userRef.current._id,
+          fullname : userRef?.current?.fullname,
+          senderId : userRef?.current?._id,
           createdTime : new Date().toISOString(),
           content :Message,
           messageId :Math.random()
@@ -173,10 +224,11 @@ const FileHandler =async (e :any) => {
 
   try {
     const formData = new FormData();
+    const roomId :string  =  params.roomId || ""
     formData.append('document', e.target.files[0]);
-    formData.append('roomId', params.roomId);
-    formData.append('senderId', userRef.current._id);
-    formData.append('fullname', userRef.current.fullname);
+    formData.append('roomId',roomId);
+    formData.append('senderId', userRef?.current?._id || "");
+    formData.append('fullname', userRef?.current?.fullname || "");
 
     // Make the API call to your backend server for user signup
     const response = await httpClient.post('/auth/document', formData, {
@@ -208,7 +260,7 @@ useEffect(()=>{
 },[Room])
 
 // Hand Raise
-const [handRaiseIds,sethandRaiseIds] = useState([])
+const [handRaiseIds,sethandRaiseIds] = useState<any>([])
 
 
 
@@ -218,63 +270,34 @@ const [handRaiseIds,sethandRaiseIds] = useState([])
 const handRaise = async() => { 
   socket.emit('raiseHand',{
     roomId : params.roomId,
-    userId :userRef.current._id
+    userId :userRef?.current?._id
   })
  }
 
 const putHandDown = async() => { 
   socket.emit('putHandDown',{
     roomId : params.roomId,
-    userId :userRef.current._id
+    userId :userRef?.current?._id
   })
  }
 
 // Media Part
-const videoRefs = useRef({});
 
 
-const handleMediaStream = (data:object) => {
-  // Check if the roomId matches and if participantId is present in the data
-  if (data.roomId === params.roomId && data.participantId) {
-    const videoElement = videoRefs.current[data.participantId];
-    if (videoElement) {
-      // Set the received stream as the srcObject of the video element
-      videoElement.srcObject = data.stream;
-      videoElement.play().catch((error) => console.error('Error playing video:', error));
-    }
-  }
-};
-// const startMediaStream = async (socket:any) => {
-//   try {
-//     console.log( videoTestRef.current)
-//     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-//     videoTestRef.current.srcObject = stream
-//     // Send media stream to the server
-//     socket.emit('media', { type: 'stream', stream : stream.getVideoTracks(), participantId: userRef.current._id, roomId: params.roomId });
 
-//     console.log('Media stream sent to the server:', stream);
-//   } catch (error) {
-//     console.error('Error accessing media:', error);
-//   }
-// };
-// const startMediaStream = async () => {
-//   try {
-//     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-// console.log(stream)
-//     // Set the media stream as the source for the video element
-//     if (videoRef.current) {
-//       videoRef.current.srcObject = stream;
-//     }
-//   } catch (error) {
-//     console.error('Error accessing media:', error);
-//   }
-// };
-// const videoRef = useRef(null);
-// useEffect(()=>{
 
-//   startMediaStream();
+// peer handling
+const [loading, setLoading] = useState(true);
+const [localStream, setLocalStream] = useState(null);
+const [micOn, setMicOn] = useState(true);
+const [showChat, setshowChat] = useState(true);
+const [share, setShare] = useState(false);
+const [pin, setPin] = useState(false);
+const [peers, setPeers] = useState([]);
+const peersRef = useRef([]);
+const localVideoRef = useRef();
 
-// },[navigator.mediaDevices])
+const [videoActive, setVideoActive] = useState(true);
 
   return (
     <div className='h-screen overflow-hidden flex flex-col p-4 relative' >
@@ -341,24 +364,24 @@ const handleMediaStream = (data:object) => {
       <Tabs.Panel value="messages" pt="xs">
       <div className=' flex flex-col h-[85vh] ' >
         <ul className='flex-1 flex-col overflow-y-scroll  gap-y-4 flex  list-none' >
-        {Messages.map((message) => {
+        {Messages.map((message:Message) => {
   if (message.type === "file") {
     return (
-      <li key="file-item" className={`min-h-[3rem] p-3  flex-col ${message.fullname === userRef.current.fullname ? "self-end" : "self-start"}  cursor-pointer max-w-[80%] flex px-2 items-center `}>
-        <p className={`${message.fullname === userRef.current.fullname ? "self-end" : "self-start"} font-semibold `}>{message.fullname === userRef.current.fullname ? "vous" : message.fullname}</p>
-        <div className={`flex-1 flex rounded-lg p-3 ${message.senderId === userRef.current._id ? "  self-end bg-blue-500" : "bg-gray-300"}`} >        <img src={MapType.has(`${message.fileType.split("/")[1]}`) ? MapType.get(`${message.fileType.split("/")[1]}`) : MapType.get("unknown")} className={`h-8 w-8`} />
-        <Link target="_blank"  className={message.senderId === userRef.current._id ? "text-white" : "text-black"} to={apiUrl + message.url} >{message.name}</Link>
+      <li key="file-item" className={`min-h-[3rem] p-3  flex-col ${message.fullname === userRef?.current?.fullname ? "self-end" : "self-start"}  cursor-pointer max-w-[80%] flex px-2 items-center `}>
+        <p className={`${message.fullname === userRef?.current?.fullname ? "self-end" : "self-start"} font-semibold `}>{message.fullname === userRef?.current?.fullname ? "vous" : message.fullname}</p>
+        <div className={`flex-1 flex rounded-lg p-3 ${message.senderId === userRef?.current?._id ? "  self-end bg-blue-500" : "bg-gray-300"}`} >        <img src={MapType.has(`${message.fileType.split("/")[1]}`) ? MapType.get(`${message.fileType.split("/")[1]}`) : MapType.get("unknown")} className={`h-8 w-8`} />
+        <Link target="_blank"  className={message.senderId === userRef?.current?._id ? "text-white" : "text-black"} to={apiUrl + message.url} >{message.name}</Link>
         </div>
 
       </li>
     );
   } else {
     return (
-      <li key={message.messageId} className={`min-h-[4rem] ${message.senderId === userRef.current._id ? "self-end" : ""}  max-w-[70%] px-4 gap-x-3 flex-col flex`}>
-        <p className='font-semibold self-end'>{message.fullname === userRef.current.fullname ? "vous" : message.fullname}</p>
-        <div className={`flex-1 h-auto flex flex-col p-4 rounded-lg ${message.senderId === userRef.current._id ? "bg-blue-500" : "bg-gray-300"}`}>
-          <p className={message.senderId === userRef.current._id ? "text-white" : 'text-black'}>{message.content}</p>
-          <p className={message.senderId === userRef.current._id ? 'text-white text-sm self-end' : 'text-sm self-end text-black'}>{<TimeAgo locale='fr' datetime={message.createdTime} />}</p>
+      <li key={message.messageId} className={`min-h-[4rem] ${message.senderId === userRef?.current?._id ? "self-end" : ""}  max-w-[70%] px-4 gap-x-3 flex-col flex`}>
+        <p className='font-semibold self-end'>{message.fullname === userRef?.current?.fullname ? "vous" : message.fullname}</p>
+        <div className={`flex-1 h-auto flex flex-col p-4 rounded-lg ${message.senderId === userRef?.current?._id ? "bg-blue-500" : "bg-gray-300"}`}>
+          <p className={message.senderId === userRef?.current?._id ? "text-white" : 'text-black'}>{message.content}</p>
+          <p className={message.senderId === userRef?.current?._id ? 'text-white text-sm self-end' : 'text-sm self-end text-black'}>{<TimeAgo locale='fr' datetime={message.createdTime} />}</p>
         </div>
       </li>
     );
@@ -374,7 +397,7 @@ const handleMediaStream = (data:object) => {
 
   </div>) }
         <div className='h-[4rem] p-4 flex items-center w-full gap-x-2 border-t-2' >
-            <AiOutlinePaperClip onClick={()=> FileInput.current.click()} className='cursor-pointer' size={24} />
+            <AiOutlinePaperClip onClick={()=> FileInput?.current?.click()} className='cursor-pointer' size={24} />
             <Input
       rightSection={    <BsEmojiSmile onClick={()=> setEmojiStatus(!emojiStatus)} size={24} color={emojiStatus ? "#1877f2" : "#000"} className={`mr-3 cursor-pointer text-current ${emojiStatus ? "text-blue-400" : "text-black"} `} />
     }
@@ -391,11 +414,11 @@ const handleMediaStream = (data:object) => {
 
       <Tabs.Panel value="participants" pt="xs">
        <ul className='flex-1 h-[80vh] list-none' >
-       {Room.participants.map((participant,indx) => (
+       {Room.participants.map((participant:Participant,indx:number) => (
          <li key={indx.toString()} className='h-[4rem]  px-4 gap-x-3  flex items-center' >
          <Avatar src={apiUrl+ participant.photoUrl} radius={30} size={50} />
          <div className='flex-1' >
-             <p className='font-semibold'>{userRef.current.fullname ===participant.fullname? "Vous" : participant.fullname} {participant._id ===Room.adminId ?`(organisateur)` : "" }</p>
+             <p className='font-semibold'>{userRef?.current?.fullname ===participant.fullname? "Vous" : participant.fullname} {participant._id ===Room.adminId ?`(organisateur)` : "" }</p>
              <p className='text-gray-400'>{participant.email}</p>
          </div>
          <div className='bg-blue-600 h-8 w-8 cursor-pointer flex items-center justify-center rounded-full'>
@@ -423,17 +446,7 @@ const handleMediaStream = (data:object) => {
 <div style={GridStyle} className={`flex-1 grid gap-2 border rounded-lg relative`}>
   {/* Me Or Presentation */}
   { Room.participants.map((participant,index)=> (
-         <div key={index.toString()} className=' items-center flex justify-center  rounded-lg bg-black relative' >
-          {handRaiseIds.includes(participant._id) && <PiHandFill className='absolute top-6 right-6 ' color='#F7D7B5'  size={25}  /> }
-         <img className='h-[5rem] w-[5rem] rounded-full' src={apiUrl+ participant.photoUrl} />
-         <div className='absolute bottom-0 z-40  h-[3rem] items-center flex justify-between px-2  w-full' >
-             <p className='text-white' >{participant.fullname === userRef.current.fullname ? "Vous" : participant.fullname }</p>
-             <div className='bg-blue-600 h-8 w-8 cursor-pointer flex items-center justify-center rounded-full'>
-   <BiMicrophoneOff  color='white'  className='cursor-pointer'  />
-
-   </div>
-         </div>
-     </div>
+         <MeetGrid handRaiseIds={handRaiseIds} userRef={userRef} userVideoRef={localVideoRef} participant={participant} index={index} />
       )) }
 </div>
 
@@ -444,7 +457,7 @@ const handleMediaStream = (data:object) => {
          <div className='h-[2.3rem] bg-white p-2  w-[12rem] gap-x-3 border-[0.09rem]  border-gray-400 justify-center flex items-center  rounded-md' >
         <p className='text-base text-gray-400 tracking-wider' >{params.roomId}</p>
         <div className='h-full w-[0.1rem] bg-gray-200' ></div>
-        <CopyButton value={`http://127.0.0.1:5173?r=${params.roomId}`} timeout={2000}>
+        <CopyButton value={`${frontendUrl}?r=${params.roomId}`} timeout={2000}>
       {({ copied, copy }) => (
         <Tooltip label={copied ? 'Copied' : 'Copy'} withArrow position="right">
           <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy}>
@@ -496,7 +509,7 @@ const handleMediaStream = (data:object) => {
 
       <Menu.Dropdown>
        
-    <Menu.Item className={handRaiseIds.includes(userRef.current._id)?"bg-blue-200" :"bg-white"} onClick={()=> handRaiseIds.includes(userRef.current._id)? putHandDown() : handRaise()}  icon={<PiHandFill size={14} />}>hand Raise</Menu.Item>
+    <Menu.Item className={handRaiseIds.includes(userRef?.current?._id)?"bg-blue-200" :"bg-white"} onClick={()=> handRaiseIds.includes(userRef?.current?._id)? putHandDown() : handRaise()}  icon={<PiHandFill size={14} />}>hand Raise</Menu.Item>
     {/* <Menu.Item  icon={<BsEmojiSmile size={14} />}>send Emoji</Menu.Item> */}
 
       </Menu.Dropdown>
