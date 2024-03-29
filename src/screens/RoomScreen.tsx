@@ -84,6 +84,7 @@ import joinSFX from "../sounds/join.mp3";
 import msgSFX from "../sounds/message.mp3";
 import leaveSFX from "../sounds/leave.mp3";
 import MeetGrid from "../components/MeetGrid";
+import formatDate from "../utils/formatDate";
 
 function RoomScreen({ socket }: RoomProps) {
   const joinAudio = useRef(new Audio(joinSFX));
@@ -594,7 +595,7 @@ function RoomScreen({ socket }: RoomProps) {
         </Tabs>
       </Drawer>
       {/* Date */}
-      <h2 className="text-gray-400">Mecredi 26 juillet 2023</h2>
+      <h2 className="text-gray-400">{formatDate(Room.startDate)}</h2>
       {/* Title and Time */}
       <div className="h-[3rem] w-full flex items-center justify-between">
         <p className="text-xl font-semibold">{Room.roomName}</p>
