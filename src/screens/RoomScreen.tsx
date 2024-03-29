@@ -48,6 +48,12 @@ import calculateGridTemplateAreas from "../utils/CalculateTemplateAreas";
 // register it.
 timeago.register("fr", fr);
 
+interface emojiReaction {
+  done: boolean;
+  userId: string;
+  image: any;
+  roomId: string;
+}
 interface RoomProps {
   socket: any;
 }
@@ -86,6 +92,7 @@ import msgSFX from "../sounds/message.mp3";
 import leaveSFX from "../sounds/leave.mp3";
 import MeetGrid from "../components/MeetGrid";
 import formatDate, { formatTime } from "../utils/formatDate";
+import emojisReactions from "../utils/emojiReaction";
 
 function RoomScreen({ socket }: RoomProps) {
   const joinAudio = useRef(new Audio(joinSFX));
@@ -214,6 +221,14 @@ function RoomScreen({ socket }: RoomProps) {
         }
       }
     );
+
+    // Emoji Reaction
+    socket.on("emojiReaction", (data: emojiReaction) => {
+      if (data.roomId === params.roomId) {
+        const newEmojiReactions = [...emojiReactionsMark, data];
+        setEmojiReactionsMark(newEmojiReactions);
+      }
+    });
   }, []);
   // Manage user asking to join
   const [showCandidate, setShowCandidate] = useState(false);
@@ -321,7 +336,7 @@ function RoomScreen({ socket }: RoomProps) {
   };
 
   // Media Part
-
+  console.log(Room.participants);
   const localVideoRef = useRef();
 
   // Time in mett
@@ -342,6 +357,27 @@ function RoomScreen({ socket }: RoomProps) {
     setOpenedTitleModal(false);
   };
 
+  // ** emoji reaction
+  const [emojiReactionPicker, setEmojiReactionPicker] = useState(false);
+  const [emojiReactionsMark, setEmojiReactionsMark] = useState<emojiReaction[]>(
+    []
+  );
+
+  const pickEmoji = (image: any) => {
+    const userReaction: emojiReaction = {
+      userId: userRef.current?._id || "",
+      image,
+      done: false,
+      roomId: params.roomId || "",
+    };
+    socket.emit("emojiReaction", userReaction);
+  };
+  const getUserNameByUserId = (userId: string) => {
+    const userName = Room.participants.filter(
+      (participant) => participant._id === userId
+    )[0].fullname;
+    return userRef.current?._id === userId ? "you" : userName;
+  };
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
       {/* Modify Meeting Modal  */}
@@ -731,6 +767,36 @@ function RoomScreen({ socket }: RoomProps) {
           <div className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
             <MdScreenShare color="gray" className="cursor-pointer" />
           </div>
+          {/* Emoji */}
+          <div className="relative">
+            {emojiReactionPicker ? (
+              <div className="h-18 absolute z-50 p-3 bottom-14 left-auto rounded-full bg-white flex gap-x-4">
+                {emojisReactions.map((emoji) => (
+                  <div
+                    onClick={() => pickEmoji(emoji.image)}
+                    className="cursor-pointer flex items-center justify-center h-8 w-8 bg-gray-200 hover:bg-gray-400 rounded-full"
+                  >
+                    {emoji.image}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              ""
+            )}
+            <div
+              onClick={() => setEmojiReactionPicker(!emojiReactionPicker)}
+              className={` ${
+                emojiReactionPicker ? "bg-black" : "bg-white"
+              } shadow-sm  border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md`}
+            >
+              <BsEmojiSmile
+                size={14}
+                color={emojiReactionPicker ? "white" : "gray"}
+                className="cursor-pointer"
+              />
+            </div>
+          </div>
+
           {/* Message */}
           <div
             onClick={open}
@@ -766,7 +832,6 @@ function RoomScreen({ socket }: RoomProps) {
                     ? "put hand down"
                     : "hand Raise"}
                 </Menu.Item>
-                {/* <Menu.Item  icon={<BsEmojiSmile size={14} />}>send Emoji</Menu.Item> */}
               </Menu.Dropdown>
             </Menu>
           </div>
@@ -779,6 +844,28 @@ function RoomScreen({ socket }: RoomProps) {
           Leave meet
         </Button>
       </div>
+      {/* Emoji */}
+      {emojiReactionsMark.map((em, index) => (
+        <div
+          className={`w-auto absolute flex flex-col justify-center gap-y-4 items-center z-50 ${
+            index % 2 === 0 ? "left-24" : "left-6"
+          }  transition-opacity duration-3000 opacity-0 animate-fade-in`}
+        >
+          <div className="h-8 w-8 rounded-full text-lg  items-center flex justify-center">
+            {em.image}
+          </div>
+          <div
+            style={{
+              minWidth: "6rem",
+            }}
+            className="bg-blue-400 h-8  px-4 flex items-center justify-center rounded-full"
+          >
+            <p className="text-md font-medium">
+              {getUserNameByUserId(em.userId)}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
