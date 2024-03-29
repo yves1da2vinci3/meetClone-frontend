@@ -84,13 +84,14 @@ import joinSFX from "../sounds/join.mp3";
 import msgSFX from "../sounds/message.mp3";
 import leaveSFX from "../sounds/leave.mp3";
 import MeetGrid from "../components/MeetGrid";
-import formatDate from "../utils/formatDate";
+import formatDate, { formatTime } from "../utils/formatDate";
 
 function RoomScreen({ socket }: RoomProps) {
   const joinAudio = useRef(new Audio(joinSFX));
   const msgAudio = useRef(new Audio(msgSFX));
   const leaveAudio = useRef(new Audio(leaveSFX));
   const navigate = useNavigate();
+  const [timeInMeeting, setTimeInMeeting] = useState<string>("");
   const localStorageData = localStorage.getItem("participant");
 
   // Parse the data if it exists, or set to null if not found
@@ -312,6 +313,13 @@ function RoomScreen({ socket }: RoomProps) {
   // Media Part
 
   const localVideoRef = useRef();
+
+  // Time in mett
+  setTimeout(() => {
+    const newTime = formatTime(Room.startDate);
+    console.log('new Time : ',newTime)
+    setTimeInMeeting(newTime);
+  }, 1000);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
@@ -601,7 +609,7 @@ function RoomScreen({ socket }: RoomProps) {
         <p className="text-xl font-semibold">{Room.roomName}</p>
         <div className="h-[2.3rem] bg-white w-[8rem] drop-shadow-md border justify-center flex items-center  rounded-full">
           <p className="text-lg text-gray-400 font-semibold tracking-wider">
-            00:12:04
+            {timeInMeeting}
           </p>
         </div>
       </div>

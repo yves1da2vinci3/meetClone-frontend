@@ -75,4 +75,19 @@ const formatDate = (date: Date): string => {
   return capitalizedMonth;
 };
 
+export const formatTime = (date: Date | string | number): string => {
+  const DateObject = new Date(date);
+  const actualDate = new Date();
+  const timeInMeetHours = actualDate.getHours() - DateObject.getHours();
+  const timeInMeetMinutes = actualDate.getMinutes() - DateObject.getMinutes();
+  const inSeconds = actualDate.getSeconds() - DateObject.getSeconds();
+  const timeInMeetSeconds = inSeconds < 0 ? inSeconds * -1 : inSeconds;
+
+  const hours = String(timeInMeetHours).padStart(2, "0");
+  const minutes = String(timeInMeetMinutes).padStart(2, "0");
+  const seconds = String(timeInMeetSeconds).padStart(2, "0");
+
+  return `${hours}:${minutes}:${seconds}`;
+};
+
 export default formatDate;
