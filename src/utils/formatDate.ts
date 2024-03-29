@@ -79,7 +79,8 @@ export const formatTime = (date: Date | string | number): string => {
   const DateObject = new Date(date);
   const actualDate = new Date();
   const timeInMeetHours = actualDate.getHours() - DateObject.getHours();
-  const timeInMeetMinutes = actualDate.getMinutes() - DateObject.getMinutes();
+  const inMinutes = actualDate.getMinutes() - DateObject.getMinutes();
+  const timeInMeetMinutes = inMinutes < 0 ? inMinutes * -1 : inMinutes;
   const inSeconds = actualDate.getSeconds() - DateObject.getSeconds();
   const timeInMeetSeconds = inSeconds < 0 ? inSeconds * -1 : inSeconds;
 

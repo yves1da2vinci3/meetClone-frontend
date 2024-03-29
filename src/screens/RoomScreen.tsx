@@ -7,17 +7,19 @@ import {
   Drawer,
   Input,
   Menu,
+  Stack,
   Stepper,
   Tabs,
+  TextInput,
   Tooltip,
+  Modal,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import React, { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   BiDotsHorizontalRounded,
   BiMessageDetail,
   BiMicrophoneOff,
-  BiSmile,
   BiSolidVideo,
 } from "react-icons/bi";
 import {
@@ -25,12 +27,11 @@ import {
   BsFillPeopleFill,
   BsListTask,
   BsRecordBtn,
-  BsSoundwave,
 } from "react-icons/bs";
 import { IoCopyOutline } from "react-icons/io5";
 import { AiOutlinePaperClip } from "react-icons/ai";
 import { MdScreenShare } from "react-icons/md";
-import { FaPaperPlane } from "react-icons/fa";
+import { FaPaperPlane, FaPen, FaUpload } from "react-icons/fa";
 import { PiHandFill } from "react-icons/pi";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import httpClient, { apiUrl, frontendUrl } from "../config/ApiUrl";
@@ -203,7 +204,16 @@ function RoomScreen({ socket }: RoomProps) {
       }
     });
 
-    // Handle Media
+    // Handle update Title
+    socket.on(
+      "updateTitle",
+      (data: { roomId: string; title: string; room: Room }) => {
+        if (data.roomId === params.roomId) {
+          const newRoom: Room = { ...Room, roomName: data.title };
+          setRoom(data.room);
+        }
+      }
+    );
   }, []);
   // Manage user asking to join
   const [showCandidate, setShowCandidate] = useState(false);
@@ -317,12 +327,46 @@ function RoomScreen({ socket }: RoomProps) {
   // Time in mett
   setTimeout(() => {
     const newTime = formatTime(Room.startDate);
-    console.log('new Time : ',newTime)
     setTimeInMeeting(newTime);
   }, 1000);
 
+  // manage Meet Title
+  const [openedTitleModal, setOpenedTitleModal] = useState(false);
+  const [title, setTitle] = useState("");
+
+  const updateTitle = async () => {
+    socket.emit("updateTitle", {
+      roomId: params.roomId,
+      title: title,
+    });
+    setOpenedTitleModal(false);
+  };
+
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
+      {/* Modify Meeting Modal  */}
+      <Modal
+        title="titre de la reunion"
+        centered
+        opened={openedTitleModal}
+        onClose={() => setOpenedTitleModal(false)}
+      >
+        <Stack>
+          <TextInput
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={Room.roomName}
+          />
+          <Button
+            style={{
+              backgroundColor: "#1877f3",
+            }}
+            leftIcon={<FaUpload />}
+            onClick={() => updateTitle()}
+          >
+            sauvergarder
+          </Button>
+        </Stack>
+      </Modal>
       {/* <video ref={videoRef} autoPlay playsInline /> */}
       <input
         ref={FileInput}
@@ -606,7 +650,18 @@ function RoomScreen({ socket }: RoomProps) {
       <h2 className="text-gray-400">{formatDate(Room.startDate)}</h2>
       {/* Title and Time */}
       <div className="h-[3rem] w-full flex items-center justify-between">
-        <p className="text-xl font-semibold">{Room.roomName}</p>
+        <div className="flex gap-x-3 items-center">
+          <p className="text-xl font-semibold">{Room.roomName}</p>
+          {/* button to Modify */}
+          {userRef.current?._id === Room.adminId && (
+            <div
+              onClick={() => setOpenedTitleModal(true)}
+              className="cursor-pointer flex items-center justify-center h-8 w-8 bg-gray-200 hover:bg-gray-400 rounded-full"
+            >
+              <FaPen size={15} />
+            </div>
+          )}
+        </div>
         <div className="h-[2.3rem] bg-white w-[8rem] drop-shadow-md border justify-center flex items-center  rounded-full">
           <p className="text-lg text-gray-400 font-semibold tracking-wider">
             {timeInMeeting}
