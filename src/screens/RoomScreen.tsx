@@ -228,10 +228,10 @@ function RoomScreen({ socket }: RoomProps) {
 
     // Emoji Reaction
     socket.on("emojiReaction", (data: emojiReaction) => {
-      if (data.roomId === params.roomId  && !uniqueEmojisIds.has(data.emojiId)) {
+      if (data.roomId === params.roomId && !uniqueEmojisIds.has(data.emojiId)) {
         console.log("new emoji reaction:", data);
         setEmojiReactionsMark((prevState) => [...prevState, data]);
-        uniqueEmojisIds.add(data.emojiId)
+        uniqueEmojisIds.add(data.emojiId);
       }
     });
   }, []);
@@ -378,10 +378,14 @@ function RoomScreen({ socket }: RoomProps) {
   };
 
   const getUserNameByUserId = (userId: string) => {
-    const userName = Room.participants.filter(
+    const user = Room.participants.filter(
       (participant) => participant._id === userId
-    )[0].fullname;
-    return userRef.current?._id === userId ? "you" : userName;
+    )[0];
+    if (user) {
+      return userRef.current?._id === userId ? "you" : user.fullname;
+    } else {
+      return "gone";
+    }
   };
 
   // Function to render emoji reactions
