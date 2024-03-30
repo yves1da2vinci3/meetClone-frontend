@@ -49,6 +49,7 @@ import calculateGridTemplateAreas from "../utils/CalculateTemplateAreas";
 timeago.register("fr", fr);
 
 interface emojiReaction {
+  emojiId: string;
   done: boolean;
   userId: string;
   image: any;
@@ -68,12 +69,14 @@ interface Message {
   messageId: string;
   fileType: string;
 }
+
 interface Participant {
   email: string;
   photoUrl?: string;
   _id: string;
   fullname: string;
 }
+
 interface ParticipantData {
   // Define the properties of the Participant data object
   // Replace these with the actual properties in your data
@@ -81,6 +84,7 @@ interface ParticipantData {
   fullname: string;
   // Add more properties as needed
 }
+
 interface Room {
   adminId: string;
   participants: any[];
@@ -123,6 +127,7 @@ function RoomScreen({ socket }: RoomProps) {
   // Use a Set to store the unique messageId values
 
   const uniqueMessageIds = new Set<string>();
+  const uniqueEmojisIds = new Set<string>();
   useEffect(() => {
     // get the Room
     socket.emit("getRoom", {
@@ -158,7 +163,6 @@ function RoomScreen({ socket }: RoomProps) {
     socket.on(
       "receiveMessage",
       (data: { roomId: string; message: Message }) => {
-        console.log(data.message.createdTime);
         if (
           data.roomId === params.roomId &&
           !uniqueMessageIds.has(data.message.messageId)
@@ -224,9 +228,10 @@ function RoomScreen({ socket }: RoomProps) {
 
     // Emoji Reaction
     socket.on("emojiReaction", (data: emojiReaction) => {
-      if (data.roomId === params.roomId) {
-        const newEmojiReactions = [...emojiReactionsMark, data];
-        setEmojiReactionsMark(newEmojiReactions);
+      if (data.roomId === params.roomId  && !uniqueEmojisIds.has(data.emojiId)) {
+        console.log("new emoji reaction:", data);
+        setEmojiReactionsMark((prevState) => [...prevState, data]);
+        uniqueEmojisIds.add(data.emojiId)
       }
     });
   }, []);
@@ -272,7 +277,6 @@ function RoomScreen({ socket }: RoomProps) {
   };
   //  Emoji
   const EmojiPickerHandler = (emojiData: any) => {
-    console.log(emojiData);
     setMessageContent(Message + emojiData.emoji);
   };
   const [emojiStatus, setEmojiStatus] = useState(false);
@@ -336,7 +340,6 @@ function RoomScreen({ socket }: RoomProps) {
   };
 
   // Media Part
-  console.log(Room.participants);
   const localVideoRef = useRef();
 
   // Time in mett
@@ -369,15 +372,46 @@ function RoomScreen({ socket }: RoomProps) {
       image,
       done: false,
       roomId: params.roomId || "",
+      emojiId: Math.random().toString(),
     };
     socket.emit("emojiReaction", userReaction);
   };
+
   const getUserNameByUserId = (userId: string) => {
     const userName = Room.participants.filter(
       (participant) => participant._id === userId
     )[0].fullname;
     return userRef.current?._id === userId ? "you" : userName;
   };
+
+  // Function to render emoji reactions
+  const renderEmojiReactions = () => {
+    return emojiReactionsMark.map((em, index) => (
+      <div
+        key={index}
+        className={`w-auto absolute flex flex-col justify-center gap-y-4 items-center z-50 ${
+          index % 2 === 0 ? "left-24" : "left-6"
+        }  transition-opacity duration-3000 opacity-0 animate-fade-in`}
+      >
+        <div className="h-8 w-8 rounded-full text-lg  items-center flex justify-center">
+          {em.image}
+        </div>
+        <div
+          style={{
+            minWidth: "6rem",
+          }}
+          className="bg-blue-400 h-8  px-4 flex items-center justify-center rounded-full"
+        >
+          <p className="text-md font-medium">
+            {getUserNameByUserId(em.userId)}
+          </p>
+        </div>
+      </div>
+    ));
+  };
+  // useEffect(() => {
+  //   console.log(emojiReactionsMark);
+  // }, [emojiReactionsMark]);
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
       {/* Modify Meeting Modal  */}
@@ -844,28 +878,8 @@ function RoomScreen({ socket }: RoomProps) {
           Leave meet
         </Button>
       </div>
-      {/* Emoji */}
-      {emojiReactionsMark.map((em, index) => (
-        <div
-          className={`w-auto absolute flex flex-col justify-center gap-y-4 items-center z-50 ${
-            index % 2 === 0 ? "left-24" : "left-6"
-          }  transition-opacity duration-3000 opacity-0 animate-fade-in`}
-        >
-          <div className="h-8 w-8 rounded-full text-lg  items-center flex justify-center">
-            {em.image}
-          </div>
-          <div
-            style={{
-              minWidth: "6rem",
-            }}
-            className="bg-blue-400 h-8  px-4 flex items-center justify-center rounded-full"
-          >
-            <p className="text-md font-medium">
-              {getUserNameByUserId(em.userId)}
-            </p>
-          </div>
-        </div>
-      ))}
+      {/* Display emoji reactions */}
+      {renderEmojiReactions()}
     </div>
   );
 }
