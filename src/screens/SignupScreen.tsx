@@ -63,6 +63,15 @@ export default function Signup() {
           console.error('Please enter your username.');
           return;
         }
+        if (!file) {
+          notifications.show({
+            title: "Feedback About registration",
+            color: "red",
+            message: `Please pick an image..`,
+          });
+          console.error('Please pick an image..');
+          return;
+        }
         setIsLoading(true)
         // Create a FormData object to send the file along with other form data
         const formData = new FormData();
