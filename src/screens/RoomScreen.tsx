@@ -97,6 +97,12 @@ import leaveSFX from "../sounds/leave.mp3";
 import MeetGrid from "../components/MeetGrid";
 import formatDate, { formatTime } from "../utils/formatDate";
 import emojisReactions from "../utils/emojiReaction";
+import {
+  createDevice,
+  createSendTransport,
+  startPublishing,
+} from "../services/mediasoupService";
+import { Device } from "mediasoup-client";
 
 function RoomScreen({ socket }: RoomProps) {
   const joinAudio = useRef(new Audio(joinSFX));
@@ -340,7 +346,7 @@ function RoomScreen({ socket }: RoomProps) {
   };
 
   // Media Part
-  const localVideoRef = useRef();
+  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   // Time in mett
   setTimeout(() => {
@@ -413,9 +419,20 @@ function RoomScreen({ socket }: RoomProps) {
       </div>
     ));
   };
-  // useEffect(() => {
-  //   console.log(emojiReactionsMark);
-  // }, [emojiReactionsMark]);
+  // Mediapart
+  const [device, setDevice] = useState<Device | null>(null);
+  const [producer, setProducerTransport] = useState<any>(null);
+  useEffect(() => {
+    socket.emit("getRouterRtpCapabilities", { roomId: params.roomId });
+    socket.on("getRouterRtpCapabilities", (data: any) => {
+      console.log("from getRouterRtpCapabilities: ",data)
+      if (data.roomId === params.roomId) {
+        createDevice(setDevice, data.rtpCapabilities);
+        createSendTransport(socket, device, setProducerTransport);
+        startPublishing(producer, localVideoRef);
+      }
+    });
+  }, []);
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
       {/* Modify Meeting Modal  */}

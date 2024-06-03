@@ -14,9 +14,11 @@ interface MeetGridProps {
 }
 
 function MeetGrid({index,participant,peer,handRaiseIds,userRef,userVideoRef}:MeetGridProps) {
+  if(participant._id === userRef.current._id){
+    return <video ref={userVideoRef} />
+  }
   return (
-    <div key={index.toString()} className=' bg-black items-center flex justify-center  rounded-lg  border-2 relative' >
-          {/* {participant._id === userRef.current._id && <video ref={userVideoRef} />} */}
+    <div key={index.toString()} className=' bg-transparent items-center flex justify-center  rounded-lg  border-2 relative' >
           {handRaiseIds.includes(participant._id) && <PiHandFill className='absolute top-6 right-6 ' color='#F7D7B5'  size={25}  /> }
          <img className='h-[5rem] w-[5rem] rounded-full' src={apiUrl+ participant.photoUrl} />
          <div className='absolute bottom-0 z-40  h-[3rem] items-center flex justify-between px-2  w-full' >
