@@ -355,19 +355,17 @@ function RoomScreen({ socket }: RoomProps) {
   const handRaise = async () => {
     socket.emit("raiseHand", {
       roomId: params.roomId,
-      userId: userRef?.current?._id,
+      userId: userRef?.current?.fullname.replace(/\s/g, ""),
     });
   };
 
   const putHandDown = async () => {
     socket.emit("putHandDown", {
       roomId: params.roomId,
-      userId: userRef?.current?._id,
+      userId: userRef?.current?.fullname.replace(/\s/g, ""),
     });
   };
 
-  // Media Part
-  const localVideoRef = useRef<HTMLVideoElement>(null);
 
   // Time in mett
   setTimeout(() => {
@@ -786,7 +784,7 @@ function RoomScreen({ socket }: RoomProps) {
         style={{ height: "80vh" }}
       >
         {/* Your custom component with basic video conferencing functionality. */}
-        <MyVideoConference />
+        <MyVideoConference handRaiseIds={handRaiseIds} />
         {/* The RoomAudioRenderer takes care of room-wide audio for you. */}
         <RoomAudioRenderer />
         {/* Controls for the user to start/stop audio, video, and screen
@@ -872,18 +870,18 @@ function RoomScreen({ socket }: RoomProps) {
                 <Menu.Dropdown>
                   <Menu.Item
                     className={
-                      handRaiseIds.includes(userRef?.current?._id)
+                      handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
                         ? "bg-blue-200"
                         : "bg-white"
                     }
                     onClick={() =>
-                      handRaiseIds.includes(userRef?.current?._id)
+                      handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
                         ? putHandDown()
                         : handRaise()
                     }
                     icon={<PiHandFill size={14} />}
                   >
-                    {handRaiseIds.includes(userRef?.current?._id)
+                    {handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
                       ? "put hand down"
                       : "hand Raise"}
                   </Menu.Item>
