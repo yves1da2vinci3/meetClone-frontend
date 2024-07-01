@@ -3,11 +3,13 @@ import {
   GridLayout,
   ParticipantContext,
   ParticipantTile,
+  TrackLoop,
   useTracks,
 } from "@livekit/components-react";
 import { PiHandFill } from "react-icons/pi";
 import { Participant, Track } from "livekit-client";
-import { Stack } from "@mantine/core";
+import { Group, Stack, Text } from "@mantine/core";
+import { CustomParticipantTile } from "./CustomParticipationTile";
 
 interface MyVideoConferenceProps {
   handRaiseIds: string[];
@@ -44,7 +46,9 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
   );
 
   // Ensure uniqueness of tracks based on participant's SID
-  const uniqueTracks =  Array.from(new Map(tracks.map((track) => [track.participant.identity, track])).values());
+  const uniqueTracks = Array.from(
+    new Map(tracks.map((track) => [track.participant.identity, track])).values()
+  );
 
   return (
     <GridLayout
@@ -52,7 +56,7 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
       style={{ height: "calc(100vh - var(--lk-control-bar-height))" }}
     >
       <>
-      <ParticipantTile/>
+        <CustomParticipantTile handRaiseIds={handRaiseIds} />
       </>
     </GridLayout>
   );

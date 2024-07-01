@@ -225,6 +225,7 @@ function RoomScreen({ socket }: RoomProps) {
     // HandRaise
     // Socket event handling for raising hand
     socket.on("raiseHand", (data: { roomId: string; userId: string }) => {
+      console.log("hand :", data);
       if (data.roomId === params.roomId) {
         sethandRaiseIds((prevHandRaiseIds: string[]) => [
           ...prevHandRaiseIds,
@@ -355,17 +356,16 @@ function RoomScreen({ socket }: RoomProps) {
   const handRaise = async () => {
     socket.emit("raiseHand", {
       roomId: params.roomId,
-      userId: userRef?.current?.fullname.replace(/\s/g, ""),
+      userId: userRef?.current?.fullname.replace(/\s/g, "_"),
     });
   };
 
   const putHandDown = async () => {
     socket.emit("putHandDown", {
       roomId: params.roomId,
-      userId: userRef?.current?.fullname.replace(/\s/g, ""),
+      userId: userRef?.current?.fullname.replace(/\s/g, "_"),
     });
   };
-
 
   // Time in mett
   setTimeout(() => {
@@ -817,9 +817,12 @@ function RoomScreen({ socket }: RoomProps) {
           {/* The Main Feature */}
           <div className="h-auto  p-2  min-w-[12rem] gap-x-6 relative  border-gray-400 justify-center flex items-center  rounded-md">
             {/* Controls for media */}
-            <ControlBar controls={{
-              leave : false
-            }} variation="minimal" />
+            <ControlBar
+              controls={{
+                leave: false,
+              }}
+              variation="minimal"
+            />
             {/* Emoji */}
             <div className="relative">
               {emojiReactionPicker ? (
@@ -852,41 +855,41 @@ function RoomScreen({ socket }: RoomProps) {
 
             {/* Message */}
             <div
-              onClick={open}
-              className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
+              onClick={() =>
+                handRaiseIds.includes(
+                  userRef?.current?.fullname.replace(/\s/g, "_")
+                )
+                  ? putHandDown()
+                  : handRaise()
+              }
+              className={`${
+                handRaiseIds.includes(
+                  userRef?.current?.fullname.replace(/\s/g, "_")
+                )
+                  ? "bg-black"
+                  : "bg-white"
+              }  shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md`}
             >
-              <BiMessageDetail color="gray" className="cursor-pointer" />
+              <PiHandFill
+                color={
+                  handRaiseIds.includes(
+                    userRef?.current?.fullname.replace(/\s/g, "_")
+                  )
+                    ? "white"
+                    : "gray"
+                }
+                className="cursor-pointer"
+              />
             </div>
             {/* dots */}
-            <div className="bg-white   relative shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
-              <Menu position="top" offset={130} shadow="md" width={270}>
-                <Menu.Target>
-                  <BiDotsHorizontalRounded
-                    color="gray"
-                    className="cursor-pointer"
-                  />
-                </Menu.Target>
-
-                <Menu.Dropdown>
-                  <Menu.Item
-                    className={
-                      handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
-                        ? "bg-blue-200"
-                        : "bg-white"
-                    }
-                    onClick={() =>
-                      handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
-                        ? putHandDown()
-                        : handRaise()
-                    }
-                    icon={<PiHandFill size={14} />}
-                  >
-                    {handRaiseIds.includes(userRef?.current?.fullname.replace(/\s/g, ""))
-                      ? "put hand down"
-                      : "hand Raise"}
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
+            <div
+              onClick={open}
+              className="bg-white   relative shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
+            >
+              <BiDotsHorizontalRounded
+                color="gray"
+                className="cursor-pointer"
+              />
             </div>
           </div>
           {/* Leave the meet */}
