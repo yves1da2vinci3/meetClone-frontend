@@ -15,12 +15,14 @@ import {
   Modal,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BiDotsHorizontalRounded,
   BiMessageDetail,
+  BiMicrophone,
   BiMicrophoneOff,
   BiSolidVideo,
+  BiSolidVideoOff,
 } from "react-icons/bi";
 import {
   BsEmojiSmile,
@@ -42,9 +44,18 @@ import EmojiPicker from "emoji-picker-react";
 import fr from "timeago.js/lib/lang/fr";
 import { MapType } from "../utils/File";
 import { notifications } from "@mantine/notifications";
-import calculateRowsAndColumns from "../utils/CalculateRowsAndColums";
 import calculateGridTemplateAreas from "../utils/CalculateTemplateAreas";
 
+// LiveKit imporration
+import {
+  ControlBar,
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useLiveKitRoom,
+  useTracks,
+} from "@livekit/components-react";
+import "@livekit/components-styles";
+import { Track } from "livekit-client";
 // register it.
 timeago.register("fr", fr);
 
@@ -97,12 +108,7 @@ import leaveSFX from "../sounds/leave.mp3";
 import MeetGrid from "../components/MeetGrid";
 import formatDate, { formatTime } from "../utils/formatDate";
 import emojisReactions from "../utils/emojiReaction";
-import {
-  createDevice,
-  createSendTransport,
-  startPublishing,
-} from "../services/mediasoupService";
-import { Device } from "mediasoup-client";
+import MyVideoConference from "../components/MyvideoConference";
 
 function RoomScreen({ socket }: RoomProps) {
   const joinAudio = useRef(new Audio(joinSFX));
@@ -144,6 +150,21 @@ function RoomScreen({ socket }: RoomProps) {
       setRoom(data.room);
     });
 
+    // LiveKit Initlization
+    socket.emit("getLiveKitToken", {
+      roomId: params.roomId,
+      user: userRef?.current,
+    });
+    socket.on(
+      "liveKitToken",
+      (data: { token: string; userId: string; roomId: string }) => {
+        if (data.roomId === params.roomId) {
+          if (data.userId === userRef?.current?._id) {
+            setLiveKitToken(data.token);
+          }
+        }
+      }
+    );
     // somebody wants to join
     socket.on(
       "somebodyWantToJoinRoom",
@@ -419,20 +440,15 @@ function RoomScreen({ socket }: RoomProps) {
       </div>
     ));
   };
-  // Mediapart
-  const [device, setDevice] = useState<Device | null>(null);
-  const [producer, setProducerTransport] = useState<any>(null);
-  useEffect(() => {
-    socket.emit("getRouterRtpCapabilities", { roomId: params.roomId });
-    socket.on("getRouterRtpCapabilities", (data: any) => {
-      console.log("from getRouterRtpCapabilities: ",data)
-      if (data.roomId === params.roomId) {
-        createDevice(setDevice, data.rtpCapabilities);
-        createSendTransport(socket, device, setProducerTransport);
-        startPublishing(producer, localVideoRef);
-      }
-    });
+
+  // Handle Media with LiveKit
+
+  const SERVER_LIVEKIT_URL = useMemo(() => {
+    return import.meta.env.VITE_LIVEKIT_HOST;
   }, []);
+
+  const [liveKitToken, setLiveKitToken] = useState<string>("");
+
   return (
     <div className="h-screen overflow-hidden flex flex-col p-4 relative">
       {/* Modify Meeting Modal  */}
@@ -760,145 +776,131 @@ function RoomScreen({ socket }: RoomProps) {
         </div>
       </div>
       {/* participants */}
-      <div
-        style={GridStyle}
-        className={`flex-1 grid gap-2 border rounded-lg relative`}
+      <LiveKitRoom
+        token={liveKitToken}
+        serverUrl={SERVER_LIVEKIT_URL}
+        video={true}
+        audio={true}
+        // Use the default LiveKit theme for nice styles.
+        data-lk-theme="default"
+        style={{ height: "80vh" }}
       >
-        {/* Me Or Presentation */}
-        {Room.participants.map((participant, index) => (
-          <MeetGrid
-            handRaiseIds={handRaiseIds}
-            userRef={userRef}
-            userVideoRef={localVideoRef}
-            participant={participant}
-            index={index}
-          />
-        ))}
-      </div>
-
-      {/* Option */}
-      <div className="h-[3.5rem] w-full  flex items-center justify-between">
-        <div className="h-[2.3rem] bg-white p-2  w-[12rem] gap-x-3 border-[0.09rem]  border-gray-400 justify-center flex items-center  rounded-md">
-          <p className="text-base text-gray-400 tracking-wider">
-            {params.roomId}
-          </p>
-          <div className="h-full w-[0.1rem] bg-gray-200"></div>
-          <CopyButton
-            value={`${frontendUrl}?r=${params.roomId}`}
-            timeout={2000}
-          >
-            {({ copied, copy }) => (
-              <Tooltip
-                label={copied ? "Copied" : "Copy"}
-                withArrow
-                position="right"
-              >
-                <ActionIcon color={copied ? "teal" : "gray"} onClick={copy}>
-                  <IoCopyOutline className="cursor-pointer" />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </CopyButton>
-        </div>
-
-        {/* The Main Feature */}
-        <div className="h-auto bg-white p-2  min-w-[12rem] gap-x-6 relative  border-gray-400 justify-center flex items-center  rounded-md">
-          {/* Microphone */}
-          <div className="bg-red-600 h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
-            <BiMicrophoneOff color="white" className="cursor-pointer" />
-          </div>
-          {/* video */}
-          <div className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
-            <BiSolidVideo color="gray" className="cursor-pointer" />
-          </div>
-          {/* recording */}
-          <div
-            onClick={() => toggle()}
-            className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
-          >
-            <BsRecordBtn color="gray" className="cursor-pointer" />
-          </div>
-          {/* Sharing */}
-          <div className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
-            <MdScreenShare color="gray" className="cursor-pointer" />
-          </div>
-          {/* Emoji */}
-          <div className="relative">
-            {emojiReactionPicker ? (
-              <div className="h-18 absolute z-50 p-3 bottom-14 left-auto rounded-full bg-white flex gap-x-4">
-                {emojisReactions.map((emoji) => (
-                  <div
-                    onClick={() => pickEmoji(emoji.image)}
-                    className="cursor-pointer flex items-center justify-center h-8 w-8 bg-gray-200 hover:bg-gray-400 rounded-full"
-                  >
-                    {emoji.image}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              ""
-            )}
-            <div
-              onClick={() => setEmojiReactionPicker(!emojiReactionPicker)}
-              className={` ${
-                emojiReactionPicker ? "bg-black" : "bg-white"
-              } shadow-sm  border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md`}
+        {/* Your custom component with basic video conferencing functionality. */}
+        <MyVideoConference />
+        {/* The RoomAudioRenderer takes care of room-wide audio for you. */}
+        <RoomAudioRenderer />
+        {/* Controls for the user to start/stop audio, video, and screen
+      share tracks and to leave the room. */}
+        {/* Option */}
+        <div className="h-[3.5rem] w-full  flex items-center justify-between">
+          <div className="h-[2.3rem] bg-white p-2  w-[12rem] gap-x-3 border-[0.09rem]  border-gray-400 justify-center flex items-center  rounded-md">
+            <p className="text-base text-gray-400 tracking-wider">
+              {params.roomId}
+            </p>
+            <div className="h-full w-[0.1rem] bg-gray-200"></div>
+            <CopyButton
+              value={`${frontendUrl}?r=${params.roomId}`}
+              timeout={2000}
             >
-              <BsEmojiSmile
-                size={14}
-                color={emojiReactionPicker ? "white" : "gray"}
-                className="cursor-pointer"
-              />
-            </div>
+              {({ copied, copy }) => (
+                <Tooltip
+                  label={copied ? "Copied" : "Copy"}
+                  withArrow
+                  position="right"
+                >
+                  <ActionIcon color={copied ? "teal" : "gray"} onClick={copy}>
+                    <IoCopyOutline className="cursor-pointer" />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
           </div>
 
-          {/* Message */}
-          <div
-            onClick={open}
-            className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
-          >
-            <BiMessageDetail color="gray" className="cursor-pointer" />
-          </div>
-          {/* dots */}
-          <div className="bg-white   relative shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
-            <Menu position="top" offset={130} shadow="md" width={270}>
-              <Menu.Target>
-                <BiDotsHorizontalRounded
-                  color="gray"
+          {/* The Main Feature */}
+          <div className="h-auto  p-2  min-w-[12rem] gap-x-6 relative  border-gray-400 justify-center flex items-center  rounded-md">
+            {/* Controls for media */}
+            <ControlBar controls={{
+              leave : false
+            }} variation="minimal" />
+            {/* Emoji */}
+            <div className="relative">
+              {emojiReactionPicker ? (
+                <div className="h-18 absolute z-50 p-3 bottom-14 left-auto rounded-full bg-white flex gap-x-4">
+                  {emojisReactions.map((emoji) => (
+                    <div
+                      onClick={() => pickEmoji(emoji.image)}
+                      className="cursor-pointer flex items-center justify-center h-8 w-8 bg-gray-200 hover:bg-gray-400 rounded-full"
+                    >
+                      {emoji.image}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                ""
+              )}
+              <div
+                onClick={() => setEmojiReactionPicker(!emojiReactionPicker)}
+                className={` ${
+                  emojiReactionPicker ? "bg-black" : "bg-white"
+                } shadow-sm  border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md`}
+              >
+                <BsEmojiSmile
+                  size={14}
+                  color={emojiReactionPicker ? "white" : "gray"}
                   className="cursor-pointer"
                 />
-              </Menu.Target>
+              </div>
+            </div>
 
-              <Menu.Dropdown>
-                <Menu.Item
-                  className={
-                    handRaiseIds.includes(userRef?.current?._id)
-                      ? "bg-blue-200"
-                      : "bg-white"
-                  }
-                  onClick={() =>
-                    handRaiseIds.includes(userRef?.current?._id)
-                      ? putHandDown()
-                      : handRaise()
-                  }
-                  icon={<PiHandFill size={14} />}
-                >
-                  {handRaiseIds.includes(userRef?.current?._id)
-                    ? "put hand down"
-                    : "hand Raise"}
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
+            {/* Message */}
+            <div
+              onClick={open}
+              className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
+            >
+              <BiMessageDetail color="gray" className="cursor-pointer" />
+            </div>
+            {/* dots */}
+            <div className="bg-white   relative shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md">
+              <Menu position="top" offset={130} shadow="md" width={270}>
+                <Menu.Target>
+                  <BiDotsHorizontalRounded
+                    color="gray"
+                    className="cursor-pointer"
+                  />
+                </Menu.Target>
+
+                <Menu.Dropdown>
+                  <Menu.Item
+                    className={
+                      handRaiseIds.includes(userRef?.current?._id)
+                        ? "bg-blue-200"
+                        : "bg-white"
+                    }
+                    onClick={() =>
+                      handRaiseIds.includes(userRef?.current?._id)
+                        ? putHandDown()
+                        : handRaise()
+                    }
+                    icon={<PiHandFill size={14} />}
+                  >
+                    {handRaiseIds.includes(userRef?.current?._id)
+                      ? "put hand down"
+                      : "hand Raise"}
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </div>
           </div>
+          {/* Leave the meet */}
+          <Button
+            onClick={() => LeftMeeting()}
+            className="bg-red-500 hover:bg-red-700"
+          >
+            Leave meet
+          </Button>
         </div>
-        {/* Leave the meet */}
-        <Button
-          onClick={() => LeftMeeting()}
-          className="bg-red-500 hover:bg-red-700"
-        >
-          Leave meet
-        </Button>
-      </div>
+      </LiveKitRoom>
+
       {/* Display emoji reactions */}
       {renderEmojiReactions()}
     </div>
