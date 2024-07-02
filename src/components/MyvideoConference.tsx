@@ -5,32 +5,16 @@ import {
   ParticipantTile,
   TrackLoop,
   useTracks,
+  FocusLayout,
+  TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { PiHandFill } from "react-icons/pi";
 import { Participant, Track } from "livekit-client";
-import { Group, Stack, Text } from "@mantine/core";
 import { CustomParticipantTile } from "./CustomParticipationTile";
 
 interface MyVideoConferenceProps {
   handRaiseIds: string[];
 }
-
-const CustomParticipant: React.FC<{ participant: Participant }> = ({
-  participant,
-}) => {
-  return (
-    <ParticipantContext.Provider value={participant}>
-      <Stack className="relative">
-        <ParticipantTile title={participant.identity} />
-        <PiHandFill
-          className="absolute top-6 right-6"
-          color="#F7D7B5"
-          size={25}
-        />
-      </Stack>
-    </ParticipantContext.Provider>
-  );
-};
 
 const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
   handRaiseIds,
@@ -45,20 +29,57 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
     { onlySubscribed: false }
   );
 
-  // Ensure uniqueness of tracks based on participant's SID
+  // Ensure uniqueness of tracks based on participant's identity
   const uniqueTracks = Array.from(
     new Map(tracks.map((track) => [track.participant.identity, track])).values()
   );
 
+  const [track, setTrack] = React.useState<TrackReferenceOrPlaceholder | null>(
+    null
+  );
+
+  const toggleTrack = (trackToAdd: TrackReferenceOrPlaceholder) => {
+    if (trackToAdd === track) {
+      setTrack(null);
+      return;
+    }
+    setTrack(trackToAdd);
+  };
+
   return (
-    <GridLayout
-      tracks={uniqueTracks}
-      style={{ height: "calc(100vh - var(--lk-control-bar-height))" }}
-    >
-      <>
-        <CustomParticipantTile handRaiseIds={handRaiseIds} />
-      </>
-    </GridLayout>
+    <>
+      {track ? (
+        <FocusLayout
+          style={{ height: "calc(90vh - var(--lk-control-bar-height))" }}
+          trackRef={track}
+        >
+          <CustomParticipantTile
+            onParticipantClick={(event) => {
+              
+                toggleTrack(track);
+            }}
+            handRaiseIds={handRaiseIds}
+          />
+        </FocusLayout>
+      ) : (
+        <GridLayout
+          tracks={uniqueTracks}
+          style={{ height: "calc(100vh - var(--lk-control-bar-height))" }}
+        >
+          <CustomParticipantTile
+            onParticipantClick={(event) => {
+              const trackToToggle = tracks.find(
+                (t) => t.participant.identity === event.participant.identity
+              );
+              if (trackToToggle) {
+                toggleTrack(trackToToggle);
+              }
+            }}
+            handRaiseIds={handRaiseIds}
+          />
+        </GridLayout>
+      )}
+    </>
   );
 };
 
