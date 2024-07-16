@@ -8,8 +8,7 @@ import {
   FocusLayout,
   TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
-import { PiHandFill } from "react-icons/pi";
-import { Participant, Track } from "livekit-client";
+import {  Track } from "livekit-client";
 import { CustomParticipantTile } from "./CustomParticipationTile";
 
 interface MyVideoConferenceProps {
