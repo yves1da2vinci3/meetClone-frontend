@@ -4,26 +4,32 @@ import { PiHandFill } from 'react-icons/pi'
 import { apiUrl } from '../config/ApiUrl'
 
 
-interface MeetGridProps {
-    index: number
-    participant : any
-    peer? :any
-    handRaiseIds : string[]
-    userRef :any
-    userVideoRef :any
+interface MeetParticipant {
+  _id: string;
+  photoUrl?: string; // Made optional as it might not always be present
+  fullname: string;
 }
 
-function MeetGrid({index,participant,peer,handRaiseIds,userRef,userVideoRef}:MeetGridProps) {
-  if(participant._id === userRef.current._id){
-    return <video ref={userVideoRef} />
+interface MeetGridProps {
+    index: number;
+    participant : MeetParticipant;
+    handRaiseIds : string[];
+    userRef : React.RefObject<MeetParticipant | null>; // Assuming userRef.current can be null or a MeetParticipant
+    userVideoRef : React.RefObject<HTMLVideoElement>;
+}
+
+function MeetGrid({index, participant, handRaiseIds, userRef, userVideoRef}: MeetGridProps) {
+  // Ensure userRef and userRef.current are not null before accessing properties
+  if (userRef.current && participant._id === userRef.current._id) {
+    return <video ref={userVideoRef} autoPlay playsInline className="w-full h-full object-cover" />;
   }
   return (
-    <div key={index.toString()} className=' bg-transparent items-center flex justify-center  rounded-lg  border-2 relative' >
-          {handRaiseIds.includes(participant._id) && <PiHandFill className='absolute top-6 right-6 ' color='#F7D7B5'  size={25}  /> }
-         <img className='h-[5rem] w-[5rem] rounded-full' src={apiUrl+ participant.photoUrl} />
-         <div className='absolute bottom-0 z-40  h-[3rem] items-center flex justify-between px-2  w-full' >
-             <p className='text-white' >{participant.fullname === userRef.current.fullname ? "Vous" : participant.fullname }</p>
-             <div className='bg-blue-600 h-8 w-8 cursor-pointer flex items-center justify-center rounded-full'>
+    <div key={index.toString()} className='bg-gray-700 items-center flex justify-center rounded-lg border-2 border-gray-600 relative overflow-hidden'>
+          {handRaiseIds.includes(participant._id) && <PiHandFill className='absolute top-2 right-2 text-yellow-300' size={20} />}
+         <img className='h-20 w-20 rounded-full object-cover' src={participant.photoUrl ? apiUrl + participant.photoUrl : undefined} alt={participant.fullname} />
+         <div className='absolute bottom-0 left-0 right-0 z-10 bg-black bg-opacity-50 h-10 items-center flex justify-between px-2 w-full'>
+             <p className='text-white text-sm font-medium truncate'>{userRef.current && participant.fullname === userRef.current.fullname ? "Vous" : participant.fullname }</p>
+             <div className='bg-blue-600 h-7 w-7 cursor-pointer flex items-center justify-center rounded-full'>
    <BiMicrophoneOff  color='white'  className='cursor-pointer'  />
 
    </div>
