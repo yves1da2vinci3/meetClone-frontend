@@ -14,6 +14,8 @@ import {
   LoadingOverlay,
   Menu,
   TextInput,
+  Modal,
+  Text,
 } from "@mantine/core";
 import image1 from "../assets/image1.svg";
 import image2 from "../assets/image2.svg";
@@ -23,6 +25,7 @@ import getInitials from "../utils/getInitials";
 import generateKey from "../utils/generateKey";
 import { notifications } from "@mantine/notifications";
 import { apiUrl } from "../config/ApiUrl";
+import { createGuestUser } from "../utils/createGuest";
 interface CarouselItem {
   id: number;
   imageUrl: string;
@@ -146,34 +149,88 @@ function HomeScreen({ socket }: HomeProps) {
   };
 
   const [RoomId, setRoomId] = useState("");
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [pendingAction, setPendingAction] = useState<
+    null | { type: "create" } | { type: "join"; roomId: string }
+  >(null);
+
+  const getUser = () => {
+    const raw = localStorage.getItem("participant");
+    return raw ? JSON.parse(raw) : null;
+  };
+
+  const ensureUserOrGuest = (
+    action: { type: "create" } | { type: "join"; roomId: string }
+  ) => {
+    const user = getUser();
+    if (user) {
+      if (action.type === "create") HandlerRoomCreation(user);
+      else joinRoom(action.roomId, user);
+      return;
+    }
+    setPendingAction(action);
+    setGuestModalOpen(true);
+  };
+
+  const confirmGuest = () => {
+    if (!guestName.trim()) {
+      notifications.show({
+        title: "Nom requis",
+        message: "Entrez un nom pour rejoindre en invité",
+        color: "red",
+      });
+      return;
+    }
+    const guest = createGuestUser(guestName);
+    localStorage.setItem("participant", JSON.stringify(guest));
+    setGuestModalOpen(false);
+    const action = pendingAction;
+    setPendingAction(null);
+    if (!action) return;
+    if (action.type === "create") HandlerRoomCreation(guest);
+    else joinRoom(action.roomId, guest);
+  };
 
   //  Handle CreateRoom
-  const HandlerRoomCreation = (): void => {
+  const HandlerRoomCreation = (user = getUser()): void => {
+    if (!user) {
+      ensureUserOrGuest({ type: "create" });
+      return;
+    }
     setIsLoading(true);
-    const RoomId = generateKey();
+    const newRoomId = generateKey();
 
+    socket.emit("registerSocketUser", { userId: user._id });
     socket.emit("createRoom", {
-      user: parsedData,
-      roomId: RoomId,
+      user,
+      roomId: newRoomId,
     });
-    socket.on("feedbackCreatingRoom", (data: { status: string }) => {
+    socket.once("feedbackCreatingRoom", (data: { status: string }) => {
       if (data.status === "success") {
         setIsLoading(false);
-        navigate(`/room/${RoomId}`);
+        navigate(`/room/${newRoomId}`);
+      } else {
+        setIsLoading(false);
       }
     });
   };
   // Handle Join
-  const joinRoom = (roomId: string): void => {
+  const joinRoom = (roomId: string, user = getUser()): void => {
+    if (!user) {
+      ensureUserOrGuest({ type: "join", roomId });
+      return;
+    }
     setIsLoading(true);
-    console.log("click on join button");
+    const targetId = roomId || RoomId;
 
+    socket.emit("registerSocketUser", { userId: user._id });
     socket.emit("joinRoom", {
-      roomId: roomId ? roomId : RoomId,
-      user: parsedData,
+      roomId: targetId,
+      user,
     });
 
-    socket.on(
+    socket.once(
       "feedbackJoiningRoom",
       (data: {
         roomId: string;
@@ -181,45 +238,55 @@ function HomeScreen({ socket }: HomeProps) {
         status: string;
         message: string;
       }) => {
-        if (
-          data.roomId === RoomId ||
-          (data.roomId === queryParams.get("r") &&
-            data.askerId === parsedData?._id)
-        ) {
-          console.log("ahi");
-          if (data.status === "success") {
-            console.log("working");
-            // Update the roomId state variable with the user input
-
-            setIsLoading(false);
-            navigate(`/room/${RoomId ? RoomId : queryParams.get("r")}`);
-          } else {
-            setIsLoading(false);
-            notifications.show({
-              title: "Feedback About Joining room",
-              color: "red",
-              message: `${data.message}`,
-            });
-          }
+        if (data.askerId !== user._id) return;
+        if (data.status === "success") {
+          setIsLoading(false);
+          navigate(`/room/${data.roomId || targetId}`);
+        } else {
+          setIsLoading(false);
+          notifications.show({
+            title: "Feedback About Joining room",
+            color: "red",
+            message: `${data.message}`,
+          });
         }
       }
     );
   };
   useEffect(() => {
     const roomId = queryParams.get("r");
-    console.log("oh:", localStorage.getItem("participant"));
     if (roomId) {
-      joinRoom(roomId);
+      ensureUserOrGuest({ type: "join", roomId });
     }
-  }, []);
-  useEffect(() => {
-    if (!localStorage.getItem("participant")) {
-      navigate("/login");
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <div className="h-screen flex-1 flex flex-col ">
       <LoadingOverlay visible={isLoading} />
+      <Modal
+        opened={guestModalOpen}
+        onClose={() => setGuestModalOpen(false)}
+        title="Rejoindre en invité"
+        centered
+      >
+        <Text size="sm" c="dimmed" mb="sm">
+          Pas de compte ? Entrez un nom pour continuer.
+        </Text>
+        <TextInput
+          placeholder="Votre nom"
+          value={guestName}
+          onChange={(e) => setGuestName(e.currentTarget.value)}
+          mb="md"
+        />
+        <div className="flex gap-2 justify-end">
+          <Button variant="default" onClick={() => navigate("/login")}>
+            Se connecter
+          </Button>
+          <Button className="bg-blue-600" onClick={confirmGuest}>
+            Continuer
+          </Button>
+        </div>
+      </Modal>
 
       {/* NavBar */}
       <nav className="h-[4.5rem] pl-3 flex items-center justify-between border-b-2 border-gray-300 w-full ">
@@ -305,7 +372,7 @@ function HomeScreen({ socket }: HomeProps) {
             <div className="flex md:flex-row flex-col gap-y-2 items-center mt-10 md:mt-24 gap-x-2">
               {/* New Session */}
               <Button
-                onClick={() => HandlerRoomCreation()}
+                onClick={() => ensureUserOrGuest({ type: "create" })}
                 leftIcon={<MdVideoCall size={25} color="white" />}
                 className="bg-[#1B73E8] h-[3rem]"
               >
@@ -325,7 +392,9 @@ function HomeScreen({ socket }: HomeProps) {
               />
               {focused === true || RoomId.length > 3 ? (
                 <Button
-                  onClick={() => joinRoom(RoomId)}
+                  onClick={() =>
+                    ensureUserOrGuest({ type: "join", roomId: RoomId })
+                  }
                   className={`${
                     RoomId.length > 3
                       ? "text-blue-500 font-semibold"

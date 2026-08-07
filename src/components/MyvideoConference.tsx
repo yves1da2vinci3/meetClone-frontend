@@ -1,25 +1,24 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   GridLayout,
-  ParticipantContext,
-  ParticipantTile,
-  TrackLoop,
-  useTracks,
   FocusLayout,
   TrackReferenceOrPlaceholder,
+  useTracks,
 } from "@livekit/components-react";
-import {  Track } from "livekit-client";
+import { Track } from "livekit-client";
 import { CustomParticipantTile } from "./CustomParticipationTile";
 
 interface MyVideoConferenceProps {
   handRaiseIds: string[];
+  pinnedIdentity?: string | null;
+  onLocalPinChange?: (identity: string | null) => void;
 }
 
 const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
   handRaiseIds,
+  pinnedIdentity,
+  onLocalPinChange,
 }) => {
-  // `useTracks` returns all camera and screen share tracks. If a user
-  // joins without a published camera track, a placeholder track is returned.
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -28,7 +27,6 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
     { onlySubscribed: false }
   );
 
-  // Ensure uniqueness of tracks based on participant's identity
   const uniqueTracks = Array.from(
     new Map(tracks.map((track) => [track.participant.identity, track])).values()
   );
@@ -37,12 +35,25 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
     null
   );
 
-  const toggleTrack = (trackToAdd: TrackReferenceOrPlaceholder) => {
-    if (trackToAdd === track) {
+  useEffect(() => {
+    if (!pinnedIdentity) {
       setTrack(null);
       return;
     }
+    const found = tracks.find(
+      (t) => t.participant.identity === pinnedIdentity
+    );
+    if (found) setTrack(found);
+  }, [pinnedIdentity, tracks]);
+
+  const toggleTrack = (trackToAdd: TrackReferenceOrPlaceholder) => {
+    if (trackToAdd === track) {
+      setTrack(null);
+      onLocalPinChange?.(null);
+      return;
+    }
     setTrack(trackToAdd);
+    onLocalPinChange?.(trackToAdd.participant.identity);
   };
 
   return (
@@ -53,9 +64,8 @@ const MyVideoConference: React.FC<MyVideoConferenceProps> = ({
           trackRef={track}
         >
           <CustomParticipantTile
-            onParticipantClick={(event) => {
-              
-                toggleTrack(track);
+            onParticipantClick={() => {
+              toggleTrack(track);
             }}
             handRaiseIds={handRaiseIds}
           />
