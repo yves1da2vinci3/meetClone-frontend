@@ -148,8 +148,31 @@ export const CustomParticipantTile = /* @__PURE__ */ React.forwardRef<
     trackReference.participant.identity
   );
 
+  const tileRef = React.useRef<HTMLDivElement>(null);
+  const setRefs = (node: HTMLDivElement | null) => {
+    tileRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = tileRef.current;
+    if (!el) return;
+    if (document.fullscreenElement === el) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      el.requestFullscreen?.().catch(() => {});
+    }
+  };
+
   return (
-    <div ref={ref} style={{ position: "relative" }} {...elementProps}>
+    <div
+      {...elementProps}
+      ref={setRefs}
+      style={{ position: "relative" }}
+      onDoubleClick={onDoubleClick}
+    >
       {isHandRaised && trackReference.source !== Track.Source.ScreenShare && (
         <PiHandFill
           className="absolute z-50 top-6 right-6"

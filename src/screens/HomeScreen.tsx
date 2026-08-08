@@ -3,7 +3,7 @@ import Logo from "../assets/googleMeet.png";
 import { BsQuestionOctagon } from "react-icons/bs";
 import { PiWarningOctagon } from "react-icons/pi";
 import { MdEmail, MdVideoCall } from "react-icons/md";
-import { FiSettings } from "react-icons/fi";
+import { FiSettings, FiUser } from "react-icons/fi";
 import { BiLogOut, BiSolidKeyboard, BiVoicemail } from "react-icons/bi";
 import { IoIosArrowBack, IoIosArrowForward } from "react-icons/io";
 import { CgMenuGridO } from "react-icons/cg";
@@ -26,6 +26,7 @@ import generateKey from "../utils/generateKey";
 import { notifications } from "@mantine/notifications";
 import { apiUrl } from "../config/ApiUrl";
 import { createGuestUser } from "../utils/createGuest";
+import EditProfileModal, { ProfileUser } from "../components/EditProfileModal";
 interface CarouselItem {
   id: number;
   imageUrl: string;
@@ -149,6 +150,8 @@ function HomeScreen({ socket }: HomeProps) {
   };
 
   const [RoomId, setRoomId] = useState("");
+  const [me, setMe] = useState<ProfileUser | null>(parsedData);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [pendingAction, setPendingAction] = useState<
@@ -157,7 +160,12 @@ function HomeScreen({ socket }: HomeProps) {
 
   const getUser = () => {
     const raw = localStorage.getItem("participant");
-    return raw ? JSON.parse(raw) : null;
+    return raw ? JSON.parse(raw) : me;
+  };
+
+  const persistUser = (user: ProfileUser) => {
+    localStorage.setItem("participant", JSON.stringify(user));
+    setMe(user);
   };
 
   const ensureUserOrGuest = (
@@ -183,7 +191,7 @@ function HomeScreen({ socket }: HomeProps) {
       return;
     }
     const guest = createGuestUser(guestName);
-    localStorage.setItem("participant", JSON.stringify(guest));
+    persistUser(guest);
     setGuestModalOpen(false);
     const action = pendingAction;
     setPendingAction(null);
@@ -263,6 +271,12 @@ function HomeScreen({ socket }: HomeProps) {
   return (
     <div className="h-screen flex-1 flex flex-col ">
       <LoadingOverlay visible={isLoading} />
+      <EditProfileModal
+        opened={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        user={me}
+        onSaved={persistUser}
+      />
       <Modal
         opened={guestModalOpen}
         onClose={() => setGuestModalOpen(false)}
@@ -306,7 +320,11 @@ function HomeScreen({ socket }: HomeProps) {
           <div className="h-10 w-10 ml-4 flex items-center justify-center rounded-full cursor-pointer bg-white hover:bg-gray-200">
             <PiWarningOctagon size={23} color="gray" />
           </div>
-          <div className="h-10 ml-4 w-10 flex items-center justify-center rounded-full cursor-pointer bg-white hover:bg-gray-200">
+          <div
+            onClick={() => me && setProfileOpen(true)}
+            className="h-10 ml-4 w-10 flex items-center justify-center rounded-full cursor-pointer bg-white hover:bg-gray-200"
+            title="Profil"
+          >
             <FiSettings className="" size={23} color="gray" />
           </div>
           <div className="flex mr-4 items-center gap-x-4">
@@ -316,9 +334,7 @@ function HomeScreen({ socket }: HomeProps) {
             <Menu position="bottom-end" shadow="md" width={270}>
               <Menu.Target>
                 <Avatar className="cursor-pointer" color="cyan" radius="xl">
-                  {localStorageData
-                    ? getInitials(parsedData?.fullname || "")
-                    : ""}
+                  {me ? getInitials(me.fullname || "") : ""}
                 </Avatar>
               </Menu.Target>
 
@@ -330,18 +346,22 @@ function HomeScreen({ socket }: HomeProps) {
                     <div className="h-6 w-6 rounded-full ">
                       <Avatar
                         className="rounded-full"
-                        src={
-                          localStorageData ? apiUrl + parsedData?.photoUrl : ""
-                        }
+                        src={me?.photoUrl ? apiUrl + me.photoUrl : undefined}
                         alt="userImg"
                         size={25}
                       />
                     </div>
-                    <p>{localStorageData ? parsedData?.fullname : ""}</p>
+                    <p>{me?.fullname || ""}</p>
                   </div>{" "}
                 </Menu.Item>
                 <Menu.Item icon={<MdEmail size={14} />}>
-                  {localStorageData ? parsedData?.email : ""}
+                  {me?.email || ""}
+                </Menu.Item>
+                <Menu.Item
+                  onClick={() => setProfileOpen(true)}
+                  icon={<FiUser size={14} />}
+                >
+                  Modifier le profil
                 </Menu.Item>
                 <Menu.Item
                   onClick={() => logout()}

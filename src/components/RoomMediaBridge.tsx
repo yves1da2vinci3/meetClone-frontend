@@ -109,8 +109,19 @@ function RoomMediaBridge({
       } else if (k === "h") {
         e.preventDefault();
         onToggleHand?.();
+      } else if (k === "f") {
+        e.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
       } else if (e.key === "Escape") {
         e.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+          return;
+        }
         if (window.confirm("Quitter la réunion ?")) onLeave?.();
       }
     };

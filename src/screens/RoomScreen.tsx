@@ -53,6 +53,12 @@ import LobbyPreview from "../components/LobbyPreview";
 import RoomMediaBridge from "../components/RoomMediaBridge";
 import PollsPanel, { Poll } from "../components/PollsPanel";
 import ConnectionBanner from "../components/ConnectionBanner";
+import PipButton from "../components/PipButton";
+import FullscreenButton from "../components/FullscreenButton";
+import PresentingBanner from "../components/PresentingBanner";
+import RaisedHandsQueue, {
+  RaisedHand,
+} from "../components/RaisedHandsQueue";
 
 interface emojiReaction {
   emojiId: string;
@@ -99,6 +105,7 @@ interface Room {
   pinnedIdentity?: string | null;
   polls?: Poll[];
   messages?: Message[];
+  raisedHands?: RaisedHand[];
 }
 
 interface WaitingItem {
@@ -157,6 +164,7 @@ function RoomScreen({ socket }: RoomProps) {
   const [pinnedIdentity, setPinnedIdentity] = useState<string | null>(null);
   const [liveKitToken, setLiveKitToken] = useState<string>("");
   const [handRaiseIds, sethandRaiseIds] = useState<string[]>([]);
+  const [raisedHands, setRaisedHands] = useState<RaisedHand[]>([]);
   const [Message, setMessageContent] = useState("");
   const [emojiStatus, setEmojiStatus] = useState(false);
   const [emojiReactionPicker, setEmojiReactionPicker] = useState(false);
@@ -204,6 +212,10 @@ function RoomScreen({ socket }: RoomProps) {
       if (data.room.waitingQueue) setWaitingQueue(data.room.waitingQueue);
       if (typeof data.room.pinnedIdentity !== "undefined") {
         setPinnedIdentity(data.room.pinnedIdentity || null);
+      }
+      if (data.room.raisedHands) {
+        setRaisedHands(data.room.raisedHands);
+        sethandRaiseIds(data.room.raisedHands.map((h) => h.identity));
       }
     };
 
@@ -269,17 +281,41 @@ function RoomScreen({ socket }: RoomProps) {
       setTimeout(() => setShowLeftParticipant(false), 3000);
     };
 
-    const onRaise = (data: { roomId: string; userId: string }) => {
-      if (data.roomId === roomId) {
+    const applyHands = (hands: RaisedHand[]) => {
+      setRaisedHands(hands);
+      sethandRaiseIds(hands.map((h) => h.identity));
+    };
+
+    const onRaise = (data: {
+      roomId: string;
+      userId?: string;
+      raisedHands?: RaisedHand[];
+    }) => {
+      if (data.roomId !== roomId) return;
+      if (data.raisedHands) {
+        applyHands(data.raisedHands);
+        return;
+      }
+      if (data.userId) {
         sethandRaiseIds((prev) =>
-          prev.includes(data.userId) ? prev : [...prev, data.userId]
+          prev.includes(data.userId!) ? prev : [...prev, data.userId!]
         );
       }
     };
     const onDown = (data: { roomId: string; userId: string }) => {
       if (data.roomId === roomId) {
         sethandRaiseIds((prev) => prev.filter((id) => id !== data.userId));
+        setRaisedHands((prev) =>
+          prev.filter((h) => h.identity !== data.userId && h.userId !== data.userId)
+        );
       }
+    };
+
+    const onRaisedHandsUpdated = (data: {
+      roomId: string;
+      raisedHands: RaisedHand[];
+    }) => {
+      if (data.roomId === roomId) applyHands(data.raisedHands || []);
     };
 
     const onTitle = (data: { roomId: string; room: Room }) => {
@@ -367,6 +403,7 @@ function RoomScreen({ socket }: RoomProps) {
     socket.on("leftMeeting", onLeft);
     socket.on("raiseHand", onRaise);
     socket.on("putHandDown", onDown);
+    socket.on("raisedHandsUpdated", onRaisedHandsUpdated);
     socket.on("updateTitle", onTitle);
     socket.on("emojiReaction", onEmoji);
     socket.on("forceMute", onForceMute);
@@ -386,6 +423,7 @@ function RoomScreen({ socket }: RoomProps) {
       socket.off("leftMeeting", onLeft);
       socket.off("raiseHand", onRaise);
       socket.off("putHandDown", onDown);
+      socket.off("raisedHandsUpdated", onRaisedHandsUpdated);
       socket.off("updateTitle", onTitle);
       socket.off("emojiReaction", onEmoji);
       socket.off("forceMute", onForceMute);
@@ -495,9 +533,18 @@ function RoomScreen({ socket }: RoomProps) {
     userRef.current?.fullname.replace(/\s/g, "_") || "";
 
   const handRaise = () =>
-    socket.emit("raiseHand", { roomId, userId: identity() });
+    socket.emit("raiseHand", {
+      roomId,
+      userId: userRef.current?._id,
+      fullname: userRef.current?.fullname,
+      identity: identity(),
+    });
   const putHandDown = () =>
-    socket.emit("putHandDown", { roomId, userId: identity() });
+    socket.emit("putHandDown", {
+      roomId,
+      userId: userRef.current?._id,
+      identity: identity(),
+    });
 
   const updateTitle = () => {
     socket.emit("updateTitle", { roomId, title });
@@ -706,13 +753,13 @@ function RoomScreen({ socket }: RoomProps) {
                 <Badge
                   w={16}
                   h={16}
-                  color="gray"
+                  color={raisedHands.length ? "orange" : "gray"}
                   sx={{ pointerEvents: "none" }}
                   variant="filled"
                   size="xs"
                   p={0}
                 >
-                  {Room.participants.length}
+                  {raisedHands.length || Room.participants.length}
                 </Badge>
               }
               icon={<BsFillPeopleFill size="0.8rem" />}
@@ -922,6 +969,17 @@ function RoomScreen({ socket }: RoomProps) {
           </Tabs.Panel>
 
           <Tabs.Panel value="participants" pt="xs">
+            <RaisedHandsQueue
+              hands={raisedHands}
+              isAdmin={!!isAdmin}
+              onLower={(ident) =>
+                socket.emit("lowerHand", {
+                  roomId,
+                  adminId: userRef.current?._id,
+                  identity: ident,
+                })
+              }
+            />
             {isAdmin && (
               <div className="flex gap-2 mb-3">
                 <Button size="xs" variant="outline" onClick={muteAll}>
@@ -1036,6 +1094,7 @@ function RoomScreen({ socket }: RoomProps) {
           roomId={roomId}
         />
         <ConnectionBanner />
+        <PresentingBanner />
         <RoomAudioRenderer />
         <RoomMediaBridge
           forceMuteToken={forceMuteToken}
@@ -1112,6 +1171,9 @@ function RoomScreen({ socket }: RoomProps) {
                 color={handRaiseIds.includes(identity()) ? "white" : "gray"}
               />
             </div>
+
+            <PipButton />
+            <FullscreenButton />
 
             <div
               onClick={() => setSettingsOpened(true)}
