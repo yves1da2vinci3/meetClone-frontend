@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useRoomContext } from "@livekit/components-react";
-import { Track } from "livekit-client";
 import DeviceSettingsModal from "./DeviceSettingsModal";
+import { useSpeakingWhileMuted } from "../hooks/useSpeakingWhileMuted";
 
 interface RoomMediaBridgeProps {
   forceMuteToken: number;
@@ -16,6 +16,8 @@ interface RoomMediaBridgeProps {
     videoInputId?: string;
     audioOutputId?: string;
   };
+  onToggleHand?: () => void;
+  onLeave?: () => void;
 }
 
 /** Lives inside LiveKitRoom — applies mute/device/settings side effects */
@@ -28,8 +30,11 @@ function RoomMediaBridge({
   initialAudio,
   initialVideo,
   initialDevices,
+  onToggleHand,
+  onLeave,
 }: RoomMediaBridgeProps) {
   const room = useRoomContext();
+  useSpeakingWhileMuted(room);
 
   useEffect(() => {
     if (!room) return;
@@ -73,12 +78,45 @@ function RoomMediaBridge({
     return () => {
       cancelled = true;
     };
-    // only on mount / room ready
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
-  // silence unused Track import warning by referencing Source once
-  void Track.Source.Microphone;
+  useEffect(() => {
+    if (!room) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        el?.isContentEditable
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "m") {
+        e.preventDefault();
+        room.localParticipant
+          .setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled)
+          .catch(() => {});
+      } else if (k === "v") {
+        e.preventDefault();
+        room.localParticipant
+          .setCameraEnabled(!room.localParticipant.isCameraEnabled)
+          .catch(() => {});
+      } else if (k === "h") {
+        e.preventDefault();
+        onToggleHand?.();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        if (window.confirm("Quitter la réunion ?")) onLeave?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [room, onToggleHand, onLeave]);
 
   return (
     <DeviceSettingsModal

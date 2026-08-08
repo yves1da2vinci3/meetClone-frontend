@@ -25,8 +25,7 @@ import { BsEmojiSmile, BsFillPeopleFill, BsBarChart } from "react-icons/bs";
 import { IoCopyOutline } from "react-icons/io5";
 import { AiOutlinePaperClip } from "react-icons/ai";
 import { FaPaperPlane, FaPen, FaUpload, FaChalkboardTeacher } from "react-icons/fa";
-import { FiSettings, FiCalendar } from "react-icons/fi";
-import { MdClosedCaption } from "react-icons/md";
+import { FiSettings } from "react-icons/fi";
 import { PiHandFill } from "react-icons/pi";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import httpClient, { apiUrl, frontendUrl } from "../config/ApiUrl";
@@ -54,9 +53,6 @@ import LobbyPreview from "../components/LobbyPreview";
 import RoomMediaBridge from "../components/RoomMediaBridge";
 import PollsPanel, { Poll } from "../components/PollsPanel";
 import Whiteboard, { Stroke } from "../components/Whiteboard";
-import CaptionsBar from "../components/CaptionsBar";
-import { useSpeechCaptions } from "../hooks/useSpeechCaptions";
-import { buildInviteText, downloadIcsInvite } from "../utils/icsInvite";
 
 interface emojiReaction {
   emojiId: string;
@@ -102,7 +98,6 @@ interface Room {
   waitingQueue?: { user: Participant; socketId?: string }[];
   pinnedIdentity?: string | null;
   polls?: Poll[];
-  captionsEnabled?: boolean;
   messages?: Message[];
 }
 
@@ -140,9 +135,11 @@ function RoomScreen({ socket }: RoomProps) {
     waitingQueue: [],
     pinnedIdentity: null,
     polls: [],
-    captionsEnabled: false,
   });
   const [opened, { open, close }] = useDisclosure(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const messagesEndRef = useRef<HTMLLIElement | null>(null);
+  const drawerOpenRef = useRef(false);
   const [settingsOpened, setSettingsOpened] = useState(false);
   const [blurEnabled, setBlurEnabled] = useState(false);
   const [forceMuteToken, setForceMuteToken] = useState(0);
@@ -159,10 +156,6 @@ function RoomScreen({ socket }: RoomProps) {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [pinnedIdentity, setPinnedIdentity] = useState<string | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [captionsEnabled, setCaptionsEnabled] = useState(false);
-  const [captionLines, setCaptionLines] = useState<
-    { userId: string; fullname: string; text: string }[]
-  >([]);
   const [liveKitToken, setLiveKitToken] = useState<string>("");
   const [handRaiseIds, sethandRaiseIds] = useState<string[]>([]);
   const [Message, setMessageContent] = useState("");
@@ -187,17 +180,14 @@ function RoomScreen({ socket }: RoomProps) {
 
   const joinUrl = `${frontendUrl}?r=${roomId}`;
 
-  useSpeechCaptions({
-    enabled: captionsEnabled && lobbyDone,
-    onChunk: (text) => {
-      socket.emit("captionChunk", {
-        roomId,
-        userId: userRef.current?._id,
-        fullname: userRef.current?.fullname,
-        text,
-      });
-    },
-  });
+  useEffect(() => {
+    drawerOpenRef.current = opened;
+    if (opened) setUnreadCount(0);
+  }, [opened]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [Messages]);
 
   // Socket channel + room sync as soon as possible (waiting room while in lobby)
   useEffect(() => {
@@ -215,9 +205,6 @@ function RoomScreen({ socket }: RoomProps) {
       if (data.room.waitingQueue) setWaitingQueue(data.room.waitingQueue);
       if (typeof data.room.pinnedIdentity !== "undefined") {
         setPinnedIdentity(data.room.pinnedIdentity || null);
-      }
-      if (typeof data.room.captionsEnabled === "boolean") {
-        setCaptionsEnabled(data.room.captionsEnabled);
       }
     };
 
@@ -264,6 +251,9 @@ function RoomScreen({ socket }: RoomProps) {
       }
       uniqueMessageIds.current.add(data.message.messageId);
       setMessages((prev) => [...prev, data.message]);
+      if (!drawerOpenRef.current) {
+        setUnreadCount((n) => n + 1);
+      }
       msgAudio.current.play().catch(() => {});
     };
 
@@ -369,28 +359,14 @@ function RoomScreen({ socket }: RoomProps) {
       if (data.roomId === roomId) setPolls(data.polls || []);
     };
 
-    const onCaption = (data: {
-      roomId: string;
-      userId: string;
-      fullname: string;
-      text: string;
-    }) => {
-      if (data.roomId !== roomId) return;
-      setCaptionLines((prev) =>
-        [...prev, { userId: data.userId, fullname: data.fullname, text: data.text }].slice(
-          -20
-        )
-      );
-    };
-
-    const onToggleCaptions = (data: { roomId: string; enabled: boolean }) => {
-      if (data.roomId === roomId) setCaptionsEnabled(data.enabled);
-    };
-
     const onWhiteboard = (data: { roomId: string; stroke: Stroke }) => {
       if (data.roomId === roomId) {
         setStrokes((prev) => [...prev, data.stroke]);
       }
+    };
+
+    const onWhiteboardClear = (data: { roomId: string }) => {
+      if (data.roomId === roomId) setStrokes([]);
     };
 
     socket.on("getRoom", onGetRoom);
@@ -410,9 +386,8 @@ function RoomScreen({ socket }: RoomProps) {
     socket.on("pinnedUpdated", onPinned);
     socket.on("userTyping", onTyping);
     socket.on("pollUpdated", onPoll);
-    socket.on("captionChunk", onCaption);
-    socket.on("toggleCaptions", onToggleCaptions);
     socket.on("whiteboardDraw", onWhiteboard);
+    socket.on("whiteboardClear", onWhiteboardClear);
 
     return () => {
       socket.off("getRoom", onGetRoom);
@@ -432,9 +407,8 @@ function RoomScreen({ socket }: RoomProps) {
       socket.off("pinnedUpdated", onPinned);
       socket.off("userTyping", onTyping);
       socket.off("pollUpdated", onPoll);
-      socket.off("captionChunk", onCaption);
-      socket.off("toggleCaptions", onToggleCaptions);
       socket.off("whiteboardDraw", onWhiteboard);
+      socket.off("whiteboardClear", onWhiteboardClear);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
@@ -802,7 +776,13 @@ function RoomScreen({ socket }: RoomProps) {
                 setStrokes((prev) => [...prev, stroke]);
                 socket.emit("whiteboardDraw", { roomId, stroke });
               }}
-              onClearLocal={() => setStrokes([])}
+              onClear={() => {
+                setStrokes([]);
+                socket.emit("whiteboardClear", { roomId });
+              }}
+              onUndo={() =>
+                setStrokes((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
+              }
             />
           </Tabs.Panel>
 
@@ -827,11 +807,12 @@ function RoomScreen({ socket }: RoomProps) {
                 </Text>
               )}
               <ul className="flex-1 flex-col overflow-y-scroll gap-y-4 flex list-none">
-                {Messages.map((message: Message) => {
+                {Messages.map((message: Message, idx) => {
                   if (message.type === "file") {
                     return (
                       <li
                         key={message.messageId || message.url}
+                        ref={idx === Messages.length - 1 ? messagesEndRef : undefined}
                         className={`min-h-[3rem] p-3 flex-col ${
                           message.fullname === userRef.current?.fullname
                             ? "self-end"
@@ -881,6 +862,7 @@ function RoomScreen({ socket }: RoomProps) {
                   return (
                     <li
                       key={message.messageId}
+                      ref={idx === Messages.length - 1 ? messagesEndRef : undefined}
                       className={`min-h-[4rem] ${
                         message.senderId === userRef.current?._id
                           ? "self-end"
@@ -1095,8 +1077,11 @@ function RoomScreen({ socket }: RoomProps) {
           initialAudio={mediaPrefs.audioEnabled}
           initialVideo={mediaPrefs.videoEnabled}
           initialDevices={mediaPrefs.devices}
+          onToggleHand={() =>
+            handRaiseIds.includes(identity()) ? putHandDown() : handRaise()
+          }
+          onLeave={LeftMeeting}
         />
-        <CaptionsBar lines={captionLines} enabled={captionsEnabled} />
 
         <div className="h-[3.5rem] w-full flex items-center justify-between">
           <div className="h-[2.3rem] bg-white p-2 w-auto min-w-[12rem] gap-x-3 border-[0.09rem] border-gray-400 justify-center flex items-center rounded-md">
@@ -1115,39 +1100,6 @@ function RoomScreen({ socket }: RoomProps) {
                 </Tooltip>
               )}
             </CopyButton>
-            <Tooltip label="Calendrier (.ics)">
-              <ActionIcon
-                onClick={() =>
-                  downloadIcsInvite({
-                    roomId,
-                    roomName: Room.roomName,
-                    joinUrl,
-                    startDate: new Date(Room.startDate),
-                  })
-                }
-              >
-                <FiCalendar />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Copier invitation">
-              <ActionIcon
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    buildInviteText({
-                      roomId,
-                      roomName: Room.roomName,
-                      joinUrl,
-                    })
-                  );
-                  notifications.show({
-                    message: "Invitation copiée",
-                    color: "green",
-                  });
-                }}
-              >
-                <IoCopyOutline />
-              </ActionIcon>
-            </Tooltip>
           </div>
 
           <div className="h-auto p-2 min-w-[12rem] gap-x-3 relative border-gray-400 justify-center flex items-center rounded-md">
@@ -1193,23 +1145,6 @@ function RoomScreen({ socket }: RoomProps) {
             </div>
 
             <div
-              onClick={() => {
-                const next = !captionsEnabled;
-                setCaptionsEnabled(next);
-                socket.emit("toggleCaptions", { roomId, enabled: next });
-              }}
-              className={`${
-                captionsEnabled ? "bg-black" : "bg-white"
-              } shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md`}
-              title="Sous-titres"
-            >
-              <MdClosedCaption
-                color={captionsEnabled ? "white" : "gray"}
-                size={18}
-              />
-            </div>
-
-            <div
               onClick={() => setSettingsOpened(true)}
               className="bg-white shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
               title="Paramètres"
@@ -1222,6 +1157,17 @@ function RoomScreen({ socket }: RoomProps) {
               className="bg-white relative shadow-sm border h-10 w-10 cursor-pointer flex items-center justify-center rounded-md"
             >
               <BiDotsHorizontalRounded color="gray" />
+              {unreadCount > 0 && (
+                <Badge
+                  size="xs"
+                  color="red"
+                  variant="filled"
+                  className="absolute -top-1 -right-1"
+                  sx={{ pointerEvents: "none" }}
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Badge>
+              )}
             </div>
           </div>
 
