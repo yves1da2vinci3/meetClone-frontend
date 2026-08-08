@@ -116,9 +116,9 @@ function RoomScreen({ socket }: RoomProps) {
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.frequency.value = freq;
       osc.type = "sine";
-      gain.gain.value = 0.08;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();

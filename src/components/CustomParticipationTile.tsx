@@ -114,7 +114,7 @@ export const CustomParticipantTile = /* @__PURE__ */ React.forwardRef<
     handRaiseIds,
     ...htmlProps
   }: CustomParticipantTileProps,
-  ref
+  _ref
 ) {
   const trackReference = useEnsureTrackRef(trackRef);
 
@@ -148,12 +148,7 @@ export const CustomParticipantTile = /* @__PURE__ */ React.forwardRef<
     trackReference.participant.identity
   );
 
-  const tileRef = React.useRef<HTMLDivElement>(null);
-  const setRefs = (node: HTMLDivElement | null) => {
-    tileRef.current = node;
-    if (typeof ref === "function") ref(node);
-    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
-  };
+  const tileRef = React.useRef<HTMLDivElement | null>(null);
 
   const onDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -169,7 +164,7 @@ export const CustomParticipantTile = /* @__PURE__ */ React.forwardRef<
   return (
     <div
       {...elementProps}
-      ref={setRefs}
+      ref={tileRef}
       style={{ position: "relative" }}
       onDoubleClick={onDoubleClick}
     >
