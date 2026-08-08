@@ -24,7 +24,7 @@ import {
 import { BsEmojiSmile, BsFillPeopleFill, BsBarChart } from "react-icons/bs";
 import { IoCopyOutline } from "react-icons/io5";
 import { AiOutlinePaperClip } from "react-icons/ai";
-import { FaPaperPlane, FaPen, FaUpload, FaChalkboardTeacher } from "react-icons/fa";
+import { FaPaperPlane, FaPen, FaUpload } from "react-icons/fa";
 import { FiSettings } from "react-icons/fi";
 import { PiHandFill } from "react-icons/pi";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -52,7 +52,7 @@ import MyVideoConference from "../components/MyvideoConference";
 import LobbyPreview from "../components/LobbyPreview";
 import RoomMediaBridge from "../components/RoomMediaBridge";
 import PollsPanel, { Poll } from "../components/PollsPanel";
-import Whiteboard, { Stroke } from "../components/Whiteboard";
+import ConnectionBanner from "../components/ConnectionBanner";
 
 interface emojiReaction {
   emojiId: string;
@@ -155,7 +155,6 @@ function RoomScreen({ socket }: RoomProps) {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [pinnedIdentity, setPinnedIdentity] = useState<string | null>(null);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [liveKitToken, setLiveKitToken] = useState<string>("");
   const [handRaiseIds, sethandRaiseIds] = useState<string[]>([]);
   const [Message, setMessageContent] = useState("");
@@ -359,15 +358,6 @@ function RoomScreen({ socket }: RoomProps) {
       if (data.roomId === roomId) setPolls(data.polls || []);
     };
 
-    const onWhiteboard = (data: { roomId: string; stroke: Stroke }) => {
-      if (data.roomId === roomId) {
-        setStrokes((prev) => [...prev, data.stroke]);
-      }
-    };
-
-    const onWhiteboardClear = (data: { roomId: string }) => {
-      if (data.roomId === roomId) setStrokes([]);
-    };
 
     socket.on("getRoom", onGetRoom);
     socket.on("somebodyWantToJoinRoom", onWantJoin);
@@ -386,8 +376,6 @@ function RoomScreen({ socket }: RoomProps) {
     socket.on("pinnedUpdated", onPinned);
     socket.on("userTyping", onTyping);
     socket.on("pollUpdated", onPoll);
-    socket.on("whiteboardDraw", onWhiteboard);
-    socket.on("whiteboardClear", onWhiteboardClear);
 
     return () => {
       socket.off("getRoom", onGetRoom);
@@ -407,8 +395,6 @@ function RoomScreen({ socket }: RoomProps) {
       socket.off("pinnedUpdated", onPinned);
       socket.off("userTyping", onTyping);
       socket.off("pollUpdated", onPoll);
-      socket.off("whiteboardDraw", onWhiteboard);
-      socket.off("whiteboardClear", onWhiteboardClear);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
@@ -711,9 +697,6 @@ function RoomScreen({ socket }: RoomProps) {
             <Tabs.Tab value="polls" icon={<BsBarChart size="0.8rem" />}>
               Sondages
             </Tabs.Tab>
-            <Tabs.Tab value="board" icon={<FaChalkboardTeacher size="0.8rem" />}>
-              Board
-            </Tabs.Tab>
             <Tabs.Tab value="messages" icon={<BiMessageDetail size="0.8rem" />}>
               Messages
             </Tabs.Tab>
@@ -765,23 +748,6 @@ function RoomScreen({ socket }: RoomProps) {
                   adminId: userRef.current?._id,
                   pollId,
                 })
-              }
-            />
-          </Tabs.Panel>
-
-          <Tabs.Panel value="board" pt="xs">
-            <Whiteboard
-              strokes={strokes}
-              onStroke={(stroke) => {
-                setStrokes((prev) => [...prev, stroke]);
-                socket.emit("whiteboardDraw", { roomId, stroke });
-              }}
-              onClear={() => {
-                setStrokes([]);
-                socket.emit("whiteboardClear", { roomId });
-              }}
-              onUndo={() =>
-                setStrokes((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
               }
             />
           </Tabs.Panel>
@@ -1066,7 +1032,10 @@ function RoomScreen({ socket }: RoomProps) {
           handRaiseIds={handRaiseIds}
           pinnedIdentity={pinnedIdentity}
           onLocalPinChange={onLocalPinChange}
+          joinUrl={joinUrl}
+          roomId={roomId}
         />
+        <ConnectionBanner />
         <RoomAudioRenderer />
         <RoomMediaBridge
           forceMuteToken={forceMuteToken}
