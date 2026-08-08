@@ -1,82 +1,144 @@
-import { Button, LoadingOverlay, PasswordInput, TextInput } from '@mantine/core'
-import React, { FormEvent, FormEventHandler, useState } from 'react'
-import { FaGithub } from 'react-icons/fa'
-import { Link, useNavigate } from 'react-router-dom'
-import {FcGoogle} from 'react-icons/fc'
-import {notifications} from '@mantine/notifications'
-import httpClient from '../config/ApiUrl'
-function Login() {
-    const [email,setEmail] = useState<string>("")
-    const [password,setPassword] = useState<string>("")
-      const [isLoading,setIsLoading] = useState<boolean>(false)
-      const navigate = useNavigate()
-    const login = async () => {
-        try {
-          // Basic email and password validation
-          if (!isValidEmail(email)) {
-            notifications.show({
-              title: "Feedback Authentication",
-              color: "red",
-              message: `Please enter a valid email address.`,
-            });
-            console.error('Please enter a valid email address.');
-            return;
-          }
-    
-          if (!password) {
-            notifications.show({
-              title: "Feedback Authentication",
-              color: "red",
-              message: `Please enter your password.`,
-            });
-            console.error('Please enter your password.');
-            return;
-          }
-    setIsLoading(true)
-         const {data} =   await httpClient.post("/auth/login",{email,password})
-         localStorage.setItem("participant",JSON.stringify(data.user) )
-         navigate("/")
-         
-        } catch (error : any) {
-    setIsLoading(false)
+import { Button, LoadingOverlay, PasswordInput, TextInput } from "@mantine/core";
+import { FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { notifications } from "@mantine/notifications";
+import httpClient from "../config/ApiUrl";
+import Logo from "../assets/googleMeet.png";
 
-          // Handle any network or server-related errors
-          console.error('An error occurred during login:', error);
-          notifications.show({
-            title: "Feedback Authentication",
-            color: "red",
-            message: ` ${error.response.data.message}`,
-          });
-        }
-      };
-    
-      const isValidEmail = (email:string) => {
-        // Basic email validation using a regular expression
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-      };
-    
+function AuthSidePanel({
+  title,
+  bullets,
+}: {
+  title: string;
+  bullets: string[];
+}) {
   return (
-    <div className='h-screen items-center flex-col gap-y-3 justify-center flex' >
-        <p className='md:text-xl text-lg font-semibold  ' >Welcome back</p>
-        <div className=' w-[23rem] md:w-[30rem] bg-white border shadow gap-y-2 h-[20rem] flex-col justify-center flex p-3 ' >
-          <LoadingOverlay visible={isLoading} overlayBlur={2} />
-            <p className='text-lg ' >Email</p>
-            <TextInput onChange={(e :FormEvent<HTMLInputElement>)=> setEmail(e.currentTarget.value) } placeholder='entrez votre mail' title='email' />
-            <p className='text-lg ' >Mot de passe</p>
-            <PasswordInput onChange={(e :FormEvent<HTMLInputElement>)=> setPassword(e.currentTarget.value) } placeholder='entrez votre mot de passe' />
-            <Button  onClick={login} className='bg-blue-500 mt-3 hover:bg-blue-700' >Se connecter</Button>
-        </div>
-        <div className="h-[3.5rem] flex gap-x-4 justify-center flex-row items-center  " >
-            <div className=" h-[3rem] w-[3rem] rounded  shadow hover:shadow-md cursor-pointer items-center justify-center flex  " >
-                <FcGoogle />
-            </div>
-            
-            
-         </div>
-         <p className='text-center'>pas encore enregistré ? <Link className='text-blue-400 cursor-pointer ' to="/signup"  >s'enregistrer</Link></p>
+    <div className="hidden md:flex w-[42%] min-h-screen bg-[#1a2332] text-white flex-col justify-center px-12">
+      <div className="flex items-center gap-3 mb-8">
+        <img src={Logo} alt="Meet" className="h-8" />
+        <span className="text-xl font-semibold">Meet</span>
+      </div>
+      <h1 className="text-3xl font-semibold leading-tight mb-8">{title}</h1>
+      <ul className="space-y-3 text-slate-300 text-sm">
+        {bullets.map((b) => (
+          <li key={b} className="flex gap-2">
+            <span className="text-[#1B73E8] mt-0.5">•</span>
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
     </div>
-  )
+  );
 }
 
-export default Login
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const isValidEmail = (value: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const login = async () => {
+    if (!isValidEmail(email)) {
+      notifications.show({
+        title: "Connexion",
+        color: "red",
+        message: "Entrez une adresse email valide.",
+      });
+      return;
+    }
+    if (!password) {
+      notifications.show({
+        title: "Connexion",
+        color: "red",
+        message: "Entrez votre mot de passe.",
+      });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data } = await httpClient.post("/auth/login", { email, password });
+      localStorage.setItem("participant", JSON.stringify(data.user));
+      navigate("/");
+    } catch (error: any) {
+      notifications.show({
+        title: "Connexion",
+        color: "red",
+        message: error?.response?.data?.message || "Échec de connexion",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex bg-[#f4f6f8]">
+      <AuthSidePanel
+        title="Rejoignez votre réunion en un clic"
+        bullets={[
+          "Prévisualisez micro et caméra avant d’entrer",
+          "Salle d’attente contrôlée par l’organisateur",
+          "Vidéo HD",
+        ]}
+      />
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="relative w-full max-w-md bg-white rounded-2xl border border-gray-200 p-8">
+          <LoadingOverlay visible={isLoading} overlayBlur={2} />
+          <div className="flex items-center gap-2 mb-6 md:hidden">
+            <img src={Logo} alt="Meet" className="h-7" />
+            <span className="font-semibold">Meet</span>
+          </div>
+          <h2 className="text-2xl font-semibold mb-1">Connexion</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Entrez vos identifiants pour continuer
+          </p>
+          <div className="flex flex-col gap-4">
+            <TextInput
+              label="Email"
+              placeholder="vous@email.com"
+              value={email}
+              onChange={(e: FormEvent<HTMLInputElement>) =>
+                setEmail(e.currentTarget.value)
+              }
+              onKeyDown={(e) => e.key === "Enter" && login()}
+            />
+            <PasswordInput
+              label="Mot de passe"
+              placeholder="Votre mot de passe"
+              value={password}
+              onChange={(e: FormEvent<HTMLInputElement>) =>
+                setPassword(e.currentTarget.value)
+              }
+              onKeyDown={(e) => e.key === "Enter" && login()}
+            />
+            <Button
+              onClick={login}
+              className="bg-[#1B73E8] hover:bg-[#1558b0] h-11 mt-1"
+              radius="md"
+              fullWidth
+            >
+              Se connecter
+            </Button>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="h-11 w-full rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Continuer en invité
+            </button>
+          </div>
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Pas encore de compte ?{" "}
+            <Link className="text-[#1B73E8] font-medium" to="/signup">
+              S'inscrire
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Login;
