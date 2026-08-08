@@ -17,5 +17,9 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
+  "exclude": [
+    "src/services/mediasoupService.ts",
+    "src/components/MeetGrid.tsx"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

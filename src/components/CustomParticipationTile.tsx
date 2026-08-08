@@ -152,7 +152,7 @@ export const CustomParticipantTile = /* @__PURE__ */ React.forwardRef<
   const setRefs = (node: HTMLDivElement | null) => {
     tileRef.current = node;
     if (typeof ref === "function") ref(node);
-    else if (ref) ref.current = node;
+    else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
   };
 
   const onDoubleClick = (e: React.MouseEvent) => {

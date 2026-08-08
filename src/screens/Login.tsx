@@ -3,7 +3,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import httpClient from "../config/ApiUrl";
-import Logo from "../assets/googleMeet.png";
+import MeetMark from "../assets/MeetMark";
 
 function AuthSidePanel({
   title,
@@ -15,7 +15,7 @@ function AuthSidePanel({
   return (
     <div className="hidden md:flex w-[42%] min-h-screen bg-[#1a2332] text-white flex-col justify-center px-12">
       <div className="flex items-center gap-3 mb-8">
-        <img src={Logo} alt="Meet" className="h-8" />
+        <MeetMark className="h-8 w-8" />
         <span className="text-xl font-semibold">Meet</span>
       </div>
       <h1 className="text-3xl font-semibold leading-tight mb-8">{title}</h1>
@@ -87,7 +87,7 @@ function Login() {
         <div className="relative w-full max-w-md bg-white rounded-2xl border border-gray-200 p-8">
           <LoadingOverlay visible={isLoading} overlayBlur={2} />
           <div className="flex items-center gap-2 mb-6 md:hidden">
-            <img src={Logo} alt="Meet" className="h-7" />
+            <MeetMark className="h-7 w-7" />
             <span className="font-semibold">Meet</span>
           </div>
           <h2 className="text-2xl font-semibold mb-1">Connexion</h2>

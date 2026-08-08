@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import Logo from "../assets/googleMeet.png";
+import MeetMark from "../assets/MeetMark";
 import { BsQuestionOctagon } from "react-icons/bs";
 import { PiWarningOctagon } from "react-icons/pi";
 import { MdEmail, MdVideoCall } from "react-icons/md";
@@ -305,7 +305,7 @@ function HomeScreen({ socket }: HomeProps) {
       {/* NavBar */}
       <nav className="h-[4.5rem] pl-3 flex items-center justify-between border-b-2 border-gray-300 w-full ">
         <div className=" hidden md:flex items-center w-[12rem]">
-          <img src={Logo} className="  h-[2rem]" />
+          <MeetMark className="h-8 w-8" />
           <p className="ml-2 text-lg">Meet</p>
         </div>
 

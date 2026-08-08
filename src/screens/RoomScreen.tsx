@@ -43,9 +43,6 @@ import {
 import "@livekit/components-styles";
 timeago.register("fr", fr);
 
-import joinSFX from "../sounds/join.mp3";
-import msgSFX from "../sounds/message.mp3";
-import leaveSFX from "../sounds/leave.mp3";
 import formatDate, { formatTime } from "../utils/formatDate";
 import emojisReactions from "../utils/emojiReaction";
 import MyVideoConference from "../components/MyvideoConference";
@@ -114,9 +111,28 @@ interface WaitingItem {
 }
 
 function RoomScreen({ socket }: RoomProps) {
-  const joinAudio = useRef(new Audio(joinSFX));
-  const msgAudio = useRef(new Audio(msgSFX));
-  const leaveAudio = useRef(new Audio(leaveSFX));
+  const playTone = (freq: number, ms = 180) => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        ctx.close().catch(() => {});
+      }, ms);
+    } catch {
+      /* ignore */
+    }
+  };
+  const joinAudio = useRef({ play: () => Promise.resolve(playTone(880)) });
+  const msgAudio = useRef({ play: () => Promise.resolve(playTone(660)) });
+  const leaveAudio = useRef({ play: () => Promise.resolve(playTone(220, 240)) });
   const navigate = useNavigate();
   const [timeInMeeting, setTimeInMeeting] = useState<string>("");
   const localStorageData = localStorage.getItem("participant");
